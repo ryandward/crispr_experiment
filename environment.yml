@@ -1,3 +1,4 @@
+channel_priority: flexible
 name: crispr_experiment
 channels:
   - defaults
