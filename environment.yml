@@ -1,9 +1,7 @@
 name: crispr_experiment
 channels:
-  - defaults
   - conda-forge
-  - bioconda
-  - bird
+  - conda-forge
   - r
 dependencies:
   - _libgcc_mutex=0.1=conda_forge
