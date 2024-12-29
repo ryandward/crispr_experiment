@@ -1,164 +1,160 @@
-name: crispr_experiment
 channels:
-  - defaults
-  - conda-forge
-  - bioconda
-  - bird
-  - r
+- conda-forge
 dependencies:
-_libgcc_mutex
-  - ca-certificates
-font-ttf-dejavu-sans-mono
-font-ttf-inconsolata
-font-ttf-source-code-pro
-font-ttf-ubuntu
-ld_impl_linux-64
-libglvnd
-python_abi
-tzdata
-fonts-conda-forge
-libegl
-libgomp
-_openmp_mutex
-fonts-conda-ecosystem
-libgcc
-alsa-lib
-c-ares
-libdeflate
-libexpat
-libgcc-ng
-libgfortran5
-liblzma
-libntlm
-libstdcxx
-libzlib
-  - openssl
-pthread-stubs
-xorg-libice
-xorg-libxau
-xorg-libxdmcp
-attr
-bzip2
-expat
-gettext-tools
-keyutils
-lame
-libev
-libevent
-libffi
-libgettextpo
-libgfortran
-libgpg-error
-libiconv
-libjpeg-turbo
-libnsl
-libogg
-libopus
-libpciaccess
-libpng
-libsqlite
-libssh2
-libstdcxx-ng
-libuuid
-libxcb
-libxcrypt
-lz4-c
-mpg123
-mysql-common
-ncurses
-nspr
-pixman
-tk
-zlib
-freetype
-graphite2
-icu
-libasprintf
-libcap
-libdrm
-libedit
-libgcrypt-lib
-libgettextpo-devel
-libnghttp2
-libopenblas
-libvorbis
-nss
-pcre2
-perl
-readline
-xcb-util
-xcb-util-keysyms
-xcb-util-renderutil
-xcb-util-wm
-xorg-libsm
-xorg-libx11
-zstd
-fontconfig
-krb5
-libasprintf-devel
-libblas
-libglib
-libglx
-libsystemd0
-libxml2
-mysql-libs
-python
-xcb-util-image
-xkeyboard-config
-xorg-libxext
-xorg-libxfixes
-xorg-libxrender
-cairo
-cyrus-sasl
-dbus
-gettext
-glib-tools
-libcblas
-libcups
-libcurl
-libgl
-libhwloc
-liblapack
-libllvm19
-libxkbcommon
-mdurl
-packaging
-ply
-pygments
-python-tzdata
-pytz
-setuptools
-six
-toml
-tomli
-typing_extensions
-wheel
-xorg-libxdamage
-xorg-libxxf86vm
-glib
-harfbuzz
-libclang-cpp19.1
-libclang13
-libflac
-markdown-it-py
-numpy
-openldap
-pip
-pysam
-python-dateutil
-sip
-tbb
-biopython
-bowtie
-gstreamer
-libpq
-libsndfile
-pandas
-pyqt5-sip
-rich
-gst-plugins-base
-pulseaudio-client
-qt-main
-pyqt
-  - pyyaml
+- _libgcc_mutex
+- ca-certificates
+- font-ttf-dejavu-sans-mono
+- font-ttf-inconsolata
+- font-ttf-source-code-pro
+- font-ttf-ubuntu
+- ld_impl_linux-64
+- libglvnd
+- python_abi
+- tzdata
+- fonts-conda-forge
+- libegl
+- libgomp
+- _openmp_mutex
+- fonts-conda-ecosystem
+- libgcc
+- alsa-lib
+- c-ares
+- libdeflate
+- libexpat
+- libgcc-ng
+- libgfortran5
+- liblzma
+- libntlm
+- libstdcxx
+- libzlib
+- openssl
+- pthread-stubs
+- xorg-libice
+- xorg-libxau
+- xorg-libxdmcp
+- attr
+- bzip2
+- expat
+- gettext-tools
+- keyutils
+- lame
+- libev
+- libevent
+- libffi
+- libgettextpo
+- libgfortran
+- libgpg-error
+- libiconv
+- libjpeg-turbo
+- libnsl
+- libogg
+- libopus
+- libpciaccess
+- libpng
+- libsqlite
+- libssh2
+- libstdcxx-ng
+- libuuid
+- libxcb
+- libxcrypt
+- lz4-c
+- mpg123
+- mysql-common
+- ncurses
+- nspr
+- pixman
+- tk
+- zlib
+- freetype
+- graphite2
+- icu
+- libasprintf
+- libcap
+- libdrm
+- libedit
+- libgcrypt-lib
+- libgettextpo-devel
+- libnghttp2
+- libopenblas
+- libvorbis
+- nss
+- pcre2
+- perl
+- readline
+- xcb-util
+- xcb-util-keysyms
+- xcb-util-renderutil
+- xcb-util-wm
+- xorg-libsm
+- xorg-libx11
+- zstd
+- fontconfig
+- krb5
+- libasprintf-devel
+- libblas
+- libglib
+- libglx
+- libsystemd0
+- libxml2
+- mysql-libs
+- python
+- xcb-util-image
+- xkeyboard-config
+- xorg-libxext
+- xorg-libxfixes
+- xorg-libxrender
+- cairo
+- cyrus-sasl
+- dbus
+- gettext
+- glib-tools
+- libcblas
+- libcups
+- libcurl
+- libgl
+- libhwloc
+- liblapack
+- libllvm19
+- libxkbcommon
+- mdurl
+- packaging
+- ply
+- pygments
+- python-tzdata
+- pytz
+- setuptools
+- six
+- toml
+- tomli
+- typing_extensions
+- wheel
+- xorg-libxdamage
+- xorg-libxxf86vm
+- glib
+- harfbuzz
+- libclang-cpp19.1
+- libclang13
+- libflac
+- markdown-it-py
+- numpy
+- openldap
+- pip
+- pysam
+- python-dateutil
+- sip
+- tbb
+- biopython
+- bowtie
+- gstreamer
+- libpq
+- libsndfile
+- pandas
+- pyqt5-sip
+- rich
+- gst-plugins-base
+- pulseaudio-client
+- qt-main
+- pyqt
+- pyyaml
+name: crispr_experiment
 prefix: /home/ryandward/.conda/envs/crispr_experiment
