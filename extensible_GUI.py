@@ -194,13 +194,21 @@ def main():
     # Set application-wide stylesheet
     app.setStyleSheet(
         """
-        QMainWindow {
-            background-color: white;
+        QMainWindow { background-color: #ffffff; }
+        QLineEdit, QComboBox, QSpinBox, QTextEdit, QPlainTextEdit {
+            background-color: #ffffff;
+            color: #000000;
+            border: 1px solid #dee2e6;
         }
-        QLabel {
-            color: #212529;
+        QLabel { color: #212529; }
+        QPushButton {
+            background-color: #f8f9fa;
+            color: #000000;
         }
-    """
+        QPushButton:hover {
+            background-color: #e9ecef;
+        }
+        """
     )
 
     window = MainWindow()
