@@ -1,7 +1,6 @@
-import sys
-import os
 import argparse
-import subprocess
+import os
+import sys
 from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
