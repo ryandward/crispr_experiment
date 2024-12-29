@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (
     QStyle,
     QLineEdit,
 )
-from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtGui import QIcon, QPixmap, QPalette, QColor
 from PyQt5.QtCore import Qt
 from targets_gui import BarcodeTargetSeekerGUI  # We'll move your existing GUI here
 from find_guides_gui import FindGuidesGUI  # 1) Import
@@ -185,6 +185,11 @@ def main():
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
     app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+    palette = QPalette()
+    palette.setColor(QPalette.Window, QColor("#FFFFFF"))
+    palette.setColor(QPalette.WindowText, QColor("#000000"))
+    app.setPalette(palette)
 
     # Set application-wide stylesheet
     app.setStyleSheet(
