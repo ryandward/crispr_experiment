@@ -124,6 +124,8 @@ class FindGuidesGUI(QWidget):
             QTableWidget {
                 font-family: Monospace;
                 font-size: 9pt;
+                color: #000000;
+
             }
             QHeaderView::section {
                 font-family: Monospace;
