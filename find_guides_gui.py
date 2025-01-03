@@ -79,6 +79,7 @@ class FindGuidesGUI(QWidget):
 
         self.pam_direction_combo = QComboBox()
         self.pam_direction_combo.addItems(["upstream", "downstream"])
+        self.pam_direction_combo.setCurrentText("downstream")  # Pre-select downstream
         find_guides_layout.addRow(QLabel("PAM Direction"), self.pam_direction_combo)
 
         self.regulatory_edit = QLineEdit("0")
@@ -239,17 +240,29 @@ class FindGuidesGUI(QWidget):
             )
 
             self.offtarget_filter = QCheckBox("No off-targets (Limit to 1 site)")
+            self.no_overlapping_guides_filter = QCheckBox("No overlapping guides")
+            self.no_overlapping_genes_filter = QCheckBox(
+                "No overlapping genes"
+            )  # Add new checkbox
+
+            # Create horizontal layout for checkboxes
+            checkbox_layout = QHBoxLayout()
+            checkbox_layout.addWidget(self.offtarget_filter)
+            checkbox_layout.addWidget(self.no_overlapping_guides_filter)
+            checkbox_layout.addWidget(self.no_overlapping_genes_filter)  # Add to layout
+            filter_layout.addRow(checkbox_layout)
 
             self.no_min_overlap = QCheckBox("No minimum")
             self.no_min_overlap.stateChanged.connect(self.toggle_min_overlap)
             self.min_overlap = QSpinBox()
             self.min_overlap.setRange(0, barcode_length)
+            self.min_overlap.setValue(barcode_length)  # Set default to barcode length
 
             self.no_max_overlap = QCheckBox("No maximum")
             self.no_max_overlap.stateChanged.connect(self.toggle_max_overlap)
             self.max_overlap = QSpinBox()
             self.max_overlap.setRange(0, barcode_length)
-            self.max_overlap.setValue(barcode_length)
+            self.max_overlap.setValue(barcode_length)  # Set default to barcode length
 
             overlap_layout = QHBoxLayout()
             overlap_layout.addWidget(QLabel("Min:"))
@@ -316,11 +329,10 @@ class FindGuidesGUI(QWidget):
 
             # Add all widgets to layout
             filter_layout.addRow(
-                QLabel("Orientation Filter"), self.orientation_filter_combo
+                QLabel("Guide/Gene Orientation"), self.orientation_filter_combo
             )
-            filter_layout.addRow(self.offtarget_filter)
-            filter_layout.addRow("Overlap Range:", overlap_layout)
-            filter_layout.addRow("Offset Range:", offset_layout)
+            filter_layout.addRow("Gene Body Overlap:", overlap_layout)
+            filter_layout.addRow("Gene Body Offset:", offset_layout)
             filter_layout.addRow(self.apply_filters_btn)
             filter_layout.addRow(self.save_button)
 
@@ -410,8 +422,16 @@ class FindGuidesGUI(QWidget):
         if self.all_data is None:
             return
 
+        # Create progress dialog for filtering
+        progress = QProgressDialog("Applying filters...", "Cancel", 0, 100, self)
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.setValue(0)
+        progress.show()
+
         self.table.setRowCount(0)
         filtered_data = self.all_data.copy()
+        progress.setValue(10)
 
         # Apply Orientation Filter
         filter_choice = self.orientation_filter_combo.currentText()
@@ -423,21 +443,30 @@ class FindGuidesGUI(QWidget):
             filtered_data = filtered_data[
                 filtered_data["sp_dir"] != filtered_data["tar_dir"]
             ]
+        progress.setValue(20)
 
         # Apply Off-target Filter
         if self.offtarget_filter.isChecked():
             filtered_data = filtered_data[filtered_data["sites"] == 1]
+        progress.setValue(30)
+
+        # Apply no overlapping genes filter
+        if self.no_overlapping_genes_filter.isChecked():
+            filtered_data = filtered_data[filtered_data["genes"] <= 1]
+        progress.setValue(35)
 
         # Apply overlap filter
+        progress.setLabelText("Applying overlap filters...")
         min_overlap = self.min_overlap.value()
         max_overlap = self.max_overlap.value()
         filtered_data = filtered_data[
             (filtered_data["overlap"] >= min_overlap)
             & (filtered_data["overlap"] <= max_overlap)
         ]
+        progress.setValue(40)
 
-        # Apply offset filter with No min/max handling
-        filtered_data = filtered_data.copy()
+        # Apply offset filter
+        progress.setLabelText("Applying offset filters...")
         if not self.no_min_offset.isChecked():
             filtered_data = filtered_data[
                 filtered_data["offset"] >= self.min_offset.value()
@@ -446,46 +475,71 @@ class FindGuidesGUI(QWidget):
             filtered_data = filtered_data[
                 filtered_data["offset"] <= self.max_offset.value()
             ]
+        progress.setValue(50)
 
-        # Sort filtered data by locus_tag and offset
+        # Apply no overlapping guides filter - now as the last step
+        if self.no_overlapping_guides_filter.isChecked():
+            progress.setLabelText("Processing non-overlapping guides...")
+            non_overlapping = []
+            total_groups = len(filtered_data.groupby("locus_tag"))
+            for idx, (_, group) in enumerate(filtered_data.groupby("locus_tag")):
+                sorted_guides = group.sort_values("offset")
+                current_end = float("-inf")
+
+                for _, guide in sorted_guides.iterrows():
+                    guide_length = int(self.barcode_edit.text().strip())
+                    guide_end = guide["offset"] + guide_length
+                    if guide["offset"] >= current_end:
+                        non_overlapping.append(guide)
+                        current_end = guide_end
+
+                progress.setValue(50 + (40 * idx // total_groups))
+                if progress.wasCanceled():
+                    return
+
+            filtered_data = pd.DataFrame(non_overlapping)
+        progress.setValue(90)
+
+        # Sort and store filtered data
+        progress.setLabelText("Finalizing results...")
         filtered_data = filtered_data.sort_values(["locus_tag", "offset"])
-        self.current_filtered_data = filtered_data  # Keep track of entire filtered set
+        self.current_filtered_data = filtered_data
 
-        # Show first 1000 rows of filtered data with alternating backgrounds
-        current_locus = None
-        use_alternate_color = False
-
-        for _, row in filtered_data.head(1000).iterrows():
-            table_row = self.table.rowCount()
-            self.table.insertRow(table_row)
-
-            # Change background color when locus_tag changes
-            if current_locus != row["locus_tag"]:
-                current_locus = row["locus_tag"]
-                use_alternate_color = not use_alternate_color
-
-            background_color = "#e6f3ff" if use_alternate_color else "#ffffff"
-
-            for col_idx, value in enumerate(row):
-                item = QTableWidgetItem(str(value))
-                item.setBackground(QColor(background_color))
-                self.table.setItem(table_row, col_idx, item)
-
-        self.table.resizeColumnsToContents()
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        self.table.resizeRowsToContents()  # Add this line to maintain consistent row heights
+        # Update table with first 1000 rows
+        self.update_table_with_data(filtered_data.head(1000))
+        progress.setValue(100)
 
         # Update filter results count
         self.filter_results_label.setText(
             f"Showing {len(filtered_data):,} guides after filtering"
         )
 
-        # Update status
+        # Show completion message
         QMessageBox.information(
             self,
             "Filter Applied",
             f"Showing first 1000 of {len(filtered_data):,} matching guides",
         )
+
+    def update_table_with_data(self, data):
+        """Helper method to update table with filtered data"""
+        current_locus = None
+        use_alternate_color = False
+
+        for _, row in data.iterrows():
+            table_row = self.table.rowCount()
+            self.table.insertRow(table_row)
+
+            if current_locus != row["locus_tag"]:
+                current_locus = row["locus_tag"]
+                use_alternate_color = not use_alternate_color
+
+            bg_color = "#e6f3ff" if use_alternate_color else "#ffffff"
+
+            for col_idx, value in enumerate(row):
+                item = QTableWidgetItem(str(value))
+                item.setBackground(QColor(bg_color))
+                self.table.setItem(table_row, col_idx, item)
 
     def save_filtered_data(self):
         if (
