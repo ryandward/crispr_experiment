@@ -15,6 +15,7 @@ from PyQt5.QtGui import QIcon, QPixmap, QPalette, QColor
 from PyQt5.QtCore import Qt
 from targets_gui import BarcodeTargetSeekerGUI  # We'll move your existing GUI here
 from find_guides_gui import FindGuidesGUI  # 1) Import
+from assembly_finder_gui import AssemblyFinderGUI  # New import
 
 # Configure and start process
 os.environ["COLUMNS"] = str(120)
@@ -43,10 +44,12 @@ class MainWindow(QMainWindow):
         self.welcome_page = self.create_welcome_page()
         self.targets_page = BarcodeTargetSeekerGUI()
         self.find_guides_page = FindGuidesGUI()  # 2) Instantiate
+        self.assembly_page = AssemblyFinderGUI()  # Create new page
 
         self.stacked_widget.addWidget(self.welcome_page)
         self.stacked_widget.addWidget(self.targets_page)
         self.stacked_widget.addWidget(self.find_guides_page)
+        self.stacked_widget.addWidget(self.assembly_page)
 
         # Start with welcome page
         self.stacked_widget.setCurrentWidget(self.welcome_page)
@@ -107,6 +110,13 @@ class MainWindow(QMainWindow):
         )
 
         layout.addWidget(targets_btn)
+
+        assembly_btn = self.create_tool_button(
+            "Assembly Finder",
+            "Download sequences from NCBI by accession.",
+            lambda: self.stacked_widget.setCurrentWidget(self.assembly_page),
+        )
+        layout.addWidget(assembly_btn)
 
         # Add stretch to push everything to the top
         layout.addStretch()
