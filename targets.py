@@ -645,20 +645,21 @@ def main(args):
             results["chr"].astype(str) + "_" + results["coords"].astype(str)
         )
 
-        # Fix the statistics calculation to count unique targets per spacer
-        site_counts = results.groupby("spacer")["site"].nunique()
-
-        # Fix gene counting to count unique genes per spacer
-        gene_counts = (
-            results[results["locus_tag"].notnull()]
-            .groupby("spacer")["locus_tag"]
+        # Unique targets per spacer
+        site_counts = (
+            results.groupby(["spacer", "site", "sp_dir"])
+            .ngroup()
+            .groupby(results["spacer"])
             .nunique()
         )
 
-        # Fix intergenic counting
+        # Unique genes per spacer
+        gene_counts = results.groupby("spacer")["locus_tag"].nunique(dropna=True)
+
+        # Unique intergenic sites per spacer
         intergenic_counts = (
-            results[results["locus_tag"].isnull() & results["target"].notnull()]
-            .groupby("spacer")["site"]
+            results.loc[results["locus_tag"].isna(), "site"]
+            .groupby(results["spacer"])
             .nunique()
         )
 
@@ -850,12 +851,6 @@ if __name__ == "__main__":
     parser.add_argument("pam", help="PAM sequence", type=str)
     parser.add_argument("mismatches", help="Number of allowed mismatches", type=int)
 
-    parser.add_argument(
-        "--orientation",
-        choices=["forward", "reverse", "both"],
-        default="forward",
-        help="Orientation of the barcode with respect to the gene. Default is forward.",
-    )
     parser.add_argument(
         "--mismatches",
         type=int,
