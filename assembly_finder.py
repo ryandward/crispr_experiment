@@ -146,52 +146,45 @@ def save_sequences_to_file(assemblies_sequences, progress, console, args):
     """Save the downloaded sequences to individual files."""
     if args.gui:
         print("Saving sequences to files...", file=sys.stderr)
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    assemblies_file_name = f"assemblies_{timestamp}.tsv"
     save_task = progress.add_task(
         "[3/3] Saving sequences to files...", total=len(assemblies_sequences)
     )
 
     assemblies_info = []
 
-    with open(assemblies_file_name, "w") as assemblies_file:
-        assemblies_file.write("AssemblyAccession\tOrganism\tFilePath\n")
-        for accession, sequences in assemblies_sequences.items():
-            file_path = os.path.abspath(f"sequences/{accession}.gb")
-            try:
-                os.makedirs("sequences", exist_ok=True)
-                with open(file_path, "w") as output_handle:
-                    SeqIO.write(sequences, output_handle, "genbank")
-                organism = next(
-                    iter(
-                        {
-                            seq.annotations.get("organism", "Unknown")
-                            for seq in sequences
-                        }
-                    ),
-                    "Unknown",
-                )
-                assemblies_file.write(f"{accession}\t{organism}\t{file_path}\n")
-                assemblies_info.append((accession, organism, file_path))
-            except IOError as e:
-                console.print(f"[bold red]Error writing file {file_path}: {str(e)}")
-                progress.update(save_task, advance=1, refresh=True)
-                continue
-
+    for accession, sequences in assemblies_sequences.items():
+        file_path = os.path.abspath(f"sequences/{accession}.gb")
+        try:
+            os.makedirs("sequences", exist_ok=True)
+            with open(file_path, "w") as output_handle:
+                SeqIO.write(sequences, output_handle, "genbank")
+            organism = next(
+                iter({seq.annotations.get("organism", "Unknown") for seq in sequences}),
+                "Unknown",
+            )
+            assemblies_info.append((accession, organism, file_path))
+        except IOError as e:
+            console.print(f"[bold red]Error writing file {file_path}: {str(e)}")
             progress.update(save_task, advance=1, refresh=True)
+            continue
 
-    return assemblies_file_name, assemblies_info
+        progress.update(save_task, advance=1, refresh=True)
+
+    return assemblies_info
 
 
-def append_to_download_log(assemblies_info):
+def append_to_download_log(assemblies_info, args):
     """Append the downloaded sequences information to the running log file."""
     with open(DOWNLOAD_LOG_FILE, "a") as log_file:
         if os.stat(DOWNLOAD_LOG_FILE).st_size == 0:
-            log_file.write("Timestamp\tAccession\tOrganism\tFilePath\n")
+            log_file.write("Timestamp\tAccession\tOrganism\tFilePath\tSource\n")
 
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         for accession, organism, file_path in assemblies_info:
-            log_file.write(f"{timestamp}\t{accession}\t{organism}\t{file_path}\n")
+            source = args.source  # Now using the source from command line args
+            log_file.write(
+                f"{timestamp}\t{accession}\t{organism}\t{file_path}\t{source}\n"
+            )
 
 
 def display_assemblies_table(assemblies_info, console):
@@ -270,20 +263,18 @@ def main():
             assemblies_sequences = download_assemblies_sequences(
                 assembly_data, args.source, progress, console, args
             )
-            _, assemblies_info = save_sequences_to_file(
+            assemblies_info = save_sequences_to_file(
                 assemblies_sequences, progress, console, args
             )
 
-        append_to_download_log(assemblies_info)
+        append_to_download_log(assemblies_info, args)
 
         # Print structured data for GUI mode, or use rich table for terminal
         if args.gui:
-            # First print header
+            # Print header and data rows directly
             print("AssemblyAccession\tOrganism\tFilePath", file=sys.stderr)
-            # Then print data rows
             for accession, organism, file_path in assemblies_info:
                 print(f"{accession}\t{organism}\t{file_path}", file=sys.stderr)
-            # Print completion message separately
             print(
                 f"Download complete! {len(assemblies_sequences)} sequences added.",
                 file=sys.stderr,
