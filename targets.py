@@ -99,69 +99,103 @@ def create_locus_map(genbank_file_name):
                     locus_tag = feature.qualifiers.get("locus_tag", [None])[0]
                     gene_name = feature.qualifiers.get("gene", [None])[0]
 
-                    if isinstance(feature.location, CompoundLocation) and any(
-                        part.start == 0 or part.end == len(record.seq)
-                        for part in feature.location.parts
-                    ):
-                        genome_end_segment = next(
-                            part
-                            for part in feature.location.parts
-                            if part.end == len(record.seq)
-                        )
-                        genome_start_segment = next(
-                            part for part in feature.location.parts if part.start == 0
-                        )
-                        adj_start = int(genome_end_segment.start)
-                        adj_end = int(genome_start_segment.end + len(record.seq))
-                        overhang_continue[record.id] = int(genome_start_segment.end)
+                    if isinstance(feature.location, CompoundLocation):
+                        # Handle wrapping genes by sorting parts by position
+                        parts = sorted(feature.location.parts, key=lambda x: x.start)
 
-                        for position in range(adj_start, adj_end):
-                            key = (record.id, position)
-                            locus_map.setdefault(key, []).append(
-                                (
-                                    locus_tag,
-                                    gene_name,
-                                    int(adj_start),
-                                    int(adj_end),
-                                    feature.location.strand,
-                                )
+                        if parts[0].start == 0 or parts[-1].end == len(record.seq):
+                            # For wrapped genes, create a continuous coordinate space
+                            end_segment = parts[-1]
+                            start_segment = parts[0]
+
+                            # Calculate total gene length
+                            gene_length = (end_segment.end - end_segment.start) + (
+                                start_segment.end - start_segment.start
                             )
-                    else:
-                        locations = (
-                            feature.location.parts
-                            if isinstance(feature.location, CompoundLocation)
-                            else [feature.location]
-                        )
-                        for part_location in locations:
+
+                            # Map positions in first segment (after origin)
                             for position in range(
-                                int(part_location.start), int(part_location.end)
+                                int(start_segment.start), int(start_segment.end)
+                            ):
+                                key = (record.id, position)
+                                # Store the continuous coordinates
+                                locus_map.setdefault(key, []).append(
+                                    (
+                                        locus_tag,
+                                        gene_name,
+                                        int(
+                                            end_segment.start
+                                        ),  # Real start is at the end segment
+                                        int(end_segment.start)
+                                        + gene_length,  # Total length from real start
+                                        feature.location.strand,
+                                    )
+                                )
+
+                            # Map positions in second segment (before origin)
+                            for position in range(
+                                int(end_segment.start), int(end_segment.end)
                             ):
                                 key = (record.id, position)
                                 locus_map.setdefault(key, []).append(
                                     (
                                         locus_tag,
                                         gene_name,
-                                        int(part_location.start),
-                                        int(part_location.end),
+                                        int(end_segment.start),  # Same start point
+                                        int(end_segment.start)
+                                        + gene_length,  # Same end point
                                         feature.location.strand,
                                     )
                                 )
-                                if (
-                                    overhang_continue[record.id]
-                                    <= position
-                                    < overhang_length
-                                ):
-                                    key = (record.id, position + len(record.seq))
+
+                        else:
+                            # Handle normal compound locations (not wrapping around origin)
+                            for part in parts:
+                                for position in range(int(part.start), int(part.end)):
+                                    key = (record.id, position)
                                     locus_map.setdefault(key, []).append(
                                         (
                                             locus_tag,
                                             gene_name,
-                                            int(part_location.start) + len(record.seq),
-                                            int(part_location.end) + len(record.seq),
+                                            int(part.start),
+                                            int(part.end),
                                             feature.location.strand,
                                         )
                                     )
-                all_genes[record.id] = gene_count
+                    else:
+                        # Handle normal locations
+                        for position in range(
+                            int(feature.location.start), int(feature.location.end)
+                        ):
+                            key = (record.id, position)
+                            locus_map.setdefault(key, []).append(
+                                (
+                                    locus_tag,
+                                    gene_name,
+                                    int(feature.location.start),
+                                    int(feature.location.end),
+                                    feature.location.strand,
+                                )
+                            )
+
+                            # Add overhang positions for circular genomes
+                            if (
+                                topologies[record.id] == "circular"
+                                and position < overhang_length
+                            ):
+                                key = (record.id, position + len(record.seq))
+                                locus_map.setdefault(key, []).append(
+                                    (
+                                        locus_tag,
+                                        gene_name,
+                                        int(feature.location.start) + len(record.seq),
+                                        int(feature.location.end) + len(record.seq),
+                                        feature.location.strand,
+                                    )
+                                )
+
+            all_genes[record.id] = gene_count
+
     return locus_map, organisms, seq_lens, topologies, all_genes
 
 
@@ -202,18 +236,59 @@ def get_coords(tar_start, tar_end, chrom_length):
     )
 
 
-def get_offset(target_dir, tar_start, tar_end, feature_start, feature_end):
+def get_offset(
+    target_dir, tar_start, tar_end, feature_start, feature_end, chrom_length
+):
+    # First normalize all coordinates to be within genome length
+    tar_start = tar_start % chrom_length
+    tar_end = tar_end % chrom_length
+    feature_start = feature_start % chrom_length
+    feature_end = feature_end % chrom_length
+
     if target_dir == "F":
-        return tar_start - feature_start
+        if feature_start > feature_end:  # Gene wraps around origin
+            if tar_start < feature_end:  # Target is in early part
+                return tar_start + (chrom_length - feature_start)
+            else:  # Target is in later part
+                return tar_start - feature_start
+        else:  # Normal gene
+            return tar_start - feature_start
     if target_dir == "R":
-        return feature_end - tar_end
+        if feature_start > feature_end:  # Gene wraps around origin
+            if tar_end < feature_end:  # Target is in early part
+                return (chrom_length - tar_end) + (feature_end - feature_start)
+            else:  # Target is in later part
+                return feature_end - tar_end
+        else:  # Normal gene
+            return feature_end - tar_end
     return None
 
 
-def get_overlap(tar_start, tar_end, feature_start, feature_end):
-    overlap_start = max(tar_start, feature_start)
-    overlap_end = min(tar_end, feature_end)
-    return overlap_end - overlap_start if overlap_start < overlap_end else 0
+def get_overlap(tar_start, tar_end, feature_start, feature_end, chrom_length):
+    # First normalize all coordinates to be within genome length
+    tar_start = tar_start % chrom_length
+    tar_end = tar_end % chrom_length
+    feature_start = feature_start % chrom_length
+    feature_end = feature_end % chrom_length
+
+    # Handle cases where coordinates cross the origin
+    if feature_start > feature_end:  # Feature wraps around origin
+        if tar_start < feature_end:  # Target is in the start region
+            overlap_start = tar_start
+            overlap_end = min(tar_end, feature_end)
+        elif tar_start >= feature_start:  # Target is in the end region
+            overlap_start = tar_start
+            overlap_end = min(tar_end, chrom_length)
+            if tar_end < feature_end:  # Add additional overlap in start region
+                overlap_end += min(tar_end, feature_end)
+        else:
+            return 0
+    else:  # Normal feature
+        overlap_start = max(tar_start, feature_start)
+        overlap_end = min(tar_end, feature_end)
+
+    overlap = overlap_end - overlap_start
+    return overlap if overlap >= 0 else 0
 
 
 def pam_matches(pam_pattern, extracted_pam):
@@ -250,7 +325,13 @@ def extract_downstream_pam(
 
     if dir == "F":
         if tar_end + len(pam) > topological_chrom_length:
-            return None
+            # Handle wrapping PAM by concatenating end and start of sequence
+            end_part = fasta.fetch(reference=chrom, start=tar_end).upper()
+            start_part = fasta.fetch(
+                reference=chrom, start=0, end=(tar_end + len(pam)) % true_chrom_length
+            ).upper()
+            extracted_pam = end_part + start_part
+            return extracted_pam[: len(pam)]
         extracted_pam = fasta.fetch(
             reference=chrom, start=tar_end, end=tar_end + len(pam)
         ).upper()
@@ -291,7 +372,13 @@ def extract_upstream_pam(
 
     if dir == "F":
         if tar_start - len(pam) < 0:
-            return None
+            # Handle wrapping PAM by concatenating end and start of sequence
+            end_part = fasta.fetch(
+                reference=chrom, start=true_chrom_length + (tar_start - len(pam))
+            ).upper()
+            start_part = fasta.fetch(reference=chrom, start=0, end=tar_start).upper()
+            extracted_pam = end_part + start_part
+            return extracted_pam[-len(pam) :]
         extracted_pam = fasta.fetch(
             reference=chrom, start=tar_start - len(pam), end=tar_start
         ).upper()
@@ -382,17 +469,14 @@ def parse_sam_output(
                     )
                     mismatches = int(read.get_tag("NM"))
                     chr = read.reference_name
+                    chrom_length = true_chrom_lengths.get(chr, None)
 
-                    tar_start = read.reference_start % true_chrom_lengths.get(chr, None)
-                    tar_end = read.reference_end % true_chrom_lengths.get(chr, None)
-
-                    if tar_end < tar_start:
-                        tar_start -= true_chrom_lengths.get(chr, None)
+                    # Always use modulo for consistent positive coordinates
+                    tar_start = read.reference_start % chrom_length
+                    tar_end = read.reference_end % chrom_length
 
                     sp_dir = "F" if not read.is_reverse else "R"
-                    coords = get_coords(
-                        tar_start, tar_end, true_chrom_lengths.get(chr, None)
-                    )
+                    coords = get_coords(tar_start, tar_end, chrom_length)
                     type = "mismatch" if mismatches > 0 else "perfect"
                     diff = get_diff(rows["spacer"], target)
 
@@ -458,9 +542,10 @@ def parse_sam_output(
                             tar_end,
                             feature_start,
                             feature_end,
+                            chrom_length,  # Pass chrom_length to get_offset
                         )
                         overlap = get_overlap(
-                            tar_start, tar_end, feature_start, feature_end
+                            tar_start, tar_end, feature_start, feature_end, chrom_length
                         )
 
                         rows_copy = rows.copy()
