@@ -20,12 +20,58 @@ from PyQt5.QtWidgets import (
     QCheckBox,
     QSpinBox,
     QAbstractScrollArea,
+    QGridLayout,
+    QTextEdit,
 )
 from PyQt5.QtCore import Qt, QRegExp, QProcess
-from PyQt5.QtGui import QRegExpValidator, QColor
+from PyQt5.QtGui import QRegExpValidator, QColor, QPixmap
 import csv
 import pandas as pd
 from io import StringIO
+
+
+class PreviewFileDialog(QFileDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setOption(QFileDialog.DontUseNativeDialog, True)
+        self.setViewMode(QFileDialog.Detail)
+
+        # Create preview widget with better styling
+        self.preview = QTextEdit(self)
+        self.preview.setReadOnly(True)
+        self.preview.setMinimumWidth(400)
+        self.preview.setStyleSheet(
+            """
+            QTextEdit {
+                font-family: Monospace;
+                font-size: 9pt;
+                background-color: #ffffff;
+                padding: 5px;
+            }
+        """
+        )
+
+        # Get the layout and add preview to the right side
+        layout = self.layout()
+        layout.addWidget(self.preview, 0, 3, layout.rowCount(), 1)
+
+        # Set better initial size
+        self.resize(1200, 700)
+
+        self.currentChanged.connect(self.show_preview)
+
+    def show_preview(self, path):
+        if not os.path.isfile(path):
+            self.preview.clear()
+            return
+
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                # Read first 50 lines for better preview
+                text = "".join(f.readlines()[:50])
+                self.preview.setPlainText(text)
+        except Exception as e:
+            self.preview.setPlainText(f"Could not preview file:\n{str(e)}")
 
 
 class FindGuidesGUI(QWidget):
@@ -142,15 +188,13 @@ class FindGuidesGUI(QWidget):
         self.setLayout(main_layout)
 
     def browse_genome_file(self):
-        filename, _ = QFileDialog.getOpenFileName(
-            self, "Select Genome File", "", "GenBank Files (*.gb *.gbk);;All Files (*)"
-        )
-        if filename:
-            self.genome_file_edit.setText(filename)
-
-    def go_back(self):
-        # ...existing code or implement navigation...
-        pass
+        dialog = PreviewFileDialog(self)
+        dialog.setFileMode(QFileDialog.ExistingFile)
+        dialog.setNameFilters(["GenBank Files (*.gb *.gbk)", "All Files (*)"])
+        if dialog.exec_():
+            chosen = dialog.selectedFiles()
+            if chosen:
+                self.genome_file_edit.setText(chosen[0])
 
     def run_script(self):
         genome_file = self.genome_file_edit.text().strip()
