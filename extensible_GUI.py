@@ -16,6 +16,7 @@ from PyQt5.QtCore import Qt
 from targets_gui import BarcodeTargetSeekerGUI  # We'll move your existing GUI here
 from find_guides_gui import FindGuidesGUI  # 1) Import
 from assembly_finder_gui import AssemblyFinderGUI  # New import
+from design_mismatches_gui import MismatchDesignerGUI  # New import
 
 # Configure and start process
 os.environ["COLUMNS"] = str(120)
@@ -45,11 +46,13 @@ class MainWindow(QMainWindow):
         self.targets_page = BarcodeTargetSeekerGUI()
         self.find_guides_page = FindGuidesGUI()  # 2) Instantiate
         self.assembly_page = AssemblyFinderGUI()  # Create new page
+        self.mismatch_designer_page = MismatchDesignerGUI()  # Add new page instance
 
         self.stacked_widget.addWidget(self.welcome_page)
         self.stacked_widget.addWidget(self.targets_page)
         self.stacked_widget.addWidget(self.find_guides_page)
         self.stacked_widget.addWidget(self.assembly_page)
+        self.stacked_widget.addWidget(self.mismatch_designer_page)  # Add to stack
 
         # Start with welcome page
         self.stacked_widget.setCurrentWidget(self.welcome_page)
@@ -110,6 +113,13 @@ class MainWindow(QMainWindow):
         )
 
         layout.addWidget(targets_btn)
+
+        mismatch_btn = self.create_tool_button(
+            "Design Guide Mismatches",
+            "Generate mismatched variants of existing CRISPR guides.",
+            lambda: self.stacked_widget.setCurrentWidget(self.mismatch_designer_page),
+        )
+        layout.addWidget(mismatch_btn)
 
         assembly_btn = self.create_tool_button(
             "Assembly Finder",
