@@ -62,7 +62,7 @@ class MainWindow(QMainWindow):
         page = QWidget()
         layout = QVBoxLayout()
 
-        # Add Git Pull button at the top
+        # Git Pull button at the top
         git_pull_btn = QPushButton("Update Software (Git Pull)")
         git_pull_btn.clicked.connect(self.perform_git_pull)
         git_pull_btn.setStyleSheet(
@@ -119,35 +119,58 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(welcome_label)
 
-        # Tool buttons
+        # Create a container widget for buttons with center alignment
+        button_container = QWidget()
+        button_layout = QVBoxLayout(button_container)
+        button_layout.setAlignment(Qt.AlignCenter)
+
+        # Main Tools Section
+        main_tools_label = QLabel("Main Tools")
+        main_tools_label.setStyleSheet(
+            "font-size: 18px; font-weight: bold; margin: 15px 0; color: #212529;"
+        )
+        main_tools_label.setAlignment(Qt.AlignCenter)
+        button_layout.addWidget(main_tools_label)
+
+        # Main tool buttons
         find_guides_btn = self.create_tool_button(
             "Design New Guides",
-            "Design new CRISPR-type barcodes.",
+            "Design new CRISPR-type barcodes from scratch using your genome sequence.",
             lambda: self.stacked_widget.setCurrentWidget(self.find_guides_page),
         )
-        layout.addWidget(find_guides_btn)
-
-        targets_btn = self.create_tool_button(
-            "Identify Guide Targets",
-            "Find and analyze existing CRISPR-type barcodes.",
-            lambda: self.stacked_widget.setCurrentWidget(self.targets_page),
-        )
-
-        layout.addWidget(targets_btn)
+        button_layout.addWidget(find_guides_btn, 0, Qt.AlignCenter)
 
         mismatch_btn = self.create_tool_button(
             "Design Guide Mismatches",
-            "Generate mismatched variants of existing CRISPR guides.",
+            "Generate mismatched variants of existing CRISPR guides to create barcodes.",
             lambda: self.stacked_widget.setCurrentWidget(self.mismatch_designer_page),
         )
-        layout.addWidget(mismatch_btn)
+        button_layout.addWidget(mismatch_btn, 0, Qt.AlignCenter)
+
+        # Extra Tools Section
+        extra_tools_label = QLabel("Extra Tools")
+        extra_tools_label.setStyleSheet(
+            "font-size: 18px; font-weight: bold; margin: 15px 0; color: #666666;"
+        )
+        extra_tools_label.setAlignment(Qt.AlignCenter)
+        button_layout.addWidget(extra_tools_label)
+
+        targets_btn = self.create_tool_button(
+            "Identify Guide Targets",
+            "For use with existing guides: Analyze where guides from other sources might target in your genome.",
+            lambda: self.stacked_widget.setCurrentWidget(self.targets_page),
+        )
+        button_layout.addWidget(targets_btn, 0, Qt.AlignCenter)
 
         assembly_btn = self.create_tool_button(
             "Assembly Finder",
-            "Download sequences from NCBI by accession.",
+            "Download sequences from NCBI by accession number.",
             lambda: self.stacked_widget.setCurrentWidget(self.assembly_page),
         )
-        layout.addWidget(assembly_btn)
+        button_layout.addWidget(assembly_btn, 0, Qt.AlignCenter)
+
+        # Add the button container to the main layout
+        layout.addWidget(button_container)
 
         # Add stretch to push everything to the top
         layout.addStretch()
@@ -185,51 +208,50 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"An error occurred:\n{str(e)}")
 
     def create_tool_button(self, title, description, callback):
+        # Custom button with adjusted size
         button = QPushButton()
+        button.setFixedWidth(400)  # Fixed width
+        button.setMinimumHeight(120)  # Minimum height, will expand if needed
         button.clicked.connect(callback)
 
         # Create a container widget
         container = QWidget()
         layout = QVBoxLayout(container)
-        layout.setSpacing(8)  # Increased spacing between elements
-        layout.setContentsMargins(15, 15, 15, 15)  # Increased padding
+        layout.setSpacing(4)  # Reduced spacing
+        layout.setContentsMargins(10, 10, 10, 10)  # Reduced margins
 
-        # Title with larger font and more spacing
+        # Title with larger font
         title_label = QLabel(title)
         title_label.setStyleSheet(
             """
             font-weight: bold;
-            font-size: 18px;
+            font-size: 16px;
             color: #212529;
-            margin-bottom: 8px;
             background: transparent;
         """
         )
+        title_label.setWordWrap(True)
 
-        # Description with better spacing
+        # Description with proper wrapping
         desc_label = QLabel(description)
         desc_label.setStyleSheet(
             """
             color: #666;
-            font-size: 13px;
+            font-size: 12px;
             background: transparent;
-            margin-top: 4px;
         """
         )
         desc_label.setWordWrap(True)
+        desc_label.setFixedWidth(360)  # Leave margin for padding
 
         layout.addWidget(title_label)
         layout.addWidget(desc_label)
-
-        # Custom button with fixed size
-        button = QPushButton()
-        button.setFixedSize(400, 100)  # Set a comfortable size
-        button.clicked.connect(callback)
+        layout.addStretch()  # Push content to top
 
         # Set the container as the button's content
         button.setLayout(layout)
 
-        # Style the button
+        # Update button style
         button.setStyleSheet(
             """
             QPushButton {
@@ -237,7 +259,7 @@ class MainWindow(QMainWindow):
                 border: 1px solid #dee2e6;
                 border-radius: 6px;
                 text-align: left;
-                padding: 15px;
+                padding: 12px;
             }
             QPushButton:hover {
                 background-color: #e9ecef;
