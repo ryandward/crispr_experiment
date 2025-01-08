@@ -16,8 +16,10 @@ from PyQt5.QtWidgets import (
     QHeaderView,
     QSizePolicy,
     QAbstractScrollArea,
+    QProgressDialog,  # Added this import
+    QComboBox,  # Added this import
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QProcess  # Added QProcess import
 from PyQt5.QtGui import QColor
 import pandas as pd
 import sys
@@ -73,7 +75,9 @@ class MismatchDesignerGUI(QWidget):
         self.default_params_file = os.path.join(
             os.path.dirname(__file__), "mismatch_parameters.csv"
         )
-        self.generated_mismatches = None  # Store generated mismatches
+        self.generated_mismatches = None
+        self.off_target_results = None  # New attribute to store off-target results
+        self.process = None  # Add QProcess instance variable
         self.initUI()
 
     def initUI(self):
@@ -122,7 +126,21 @@ class MismatchDesignerGUI(QWidget):
             "Enter locus tags or gene names (one per line)"
         )
         self.genes_input.setMaximumHeight(100)
-        form_layout.addRow("Genes:", self.genes_input)
+
+        # Remove the old layout for genes input and "Load from File" button
+
+        # Create QLineEdit and "Browse" button for genes file path
+        self.genes_file_input = QLineEdit()
+        genes_browse_btn = QPushButton("Browse")
+        genes_browse_btn.clicked.connect(self.load_genes_with_preview)
+
+        genes_path_layout = QHBoxLayout()
+        genes_path_layout.addWidget(self.genes_file_input)
+        genes_path_layout.addWidget(genes_browse_btn)
+        form_layout.addRow("Genes or locus tags:", genes_path_layout)
+
+        # Add the existing QTextEdit on a separate row for manual editing
+        form_layout.addRow("", self.genes_input)
 
         # Spinboxes with better styling
         self.num_variants = QSpinBox()
@@ -159,14 +177,125 @@ class MismatchDesignerGUI(QWidget):
         main_layout.addLayout(form_layout)
         main_layout.addWidget(self.generate_btn)
 
-        # Add save controls layout after generate button
-        save_layout = QHBoxLayout()
+        # Off-target Settings Section
+        self.off_target_settings_box = QWidget()
+        self.off_target_settings_box.setEnabled(False)
+        off_target_layout = QFormLayout(self.off_target_settings_box)
 
-        # Output file input
+        # Add disabled state styling
+        self.off_target_settings_box.setStyleSheet(
+            """
+            QWidget:disabled {
+                color: #999999;
+            }
+            QLineEdit:disabled, QComboBox:disabled {
+                background-color: #f0f0f0;
+                color: #999999;
+            }
+        """
+        )
+
+        off_target_settings_title = QLabel(
+            "Off-target Settings (Available after generating mismatches)"
+        )
+        off_target_settings_title.setStyleSheet(
+            """
+            font-size: 14px;
+            font-weight: bold;
+            margin: 10px 0;
+            color: #999999;
+            """
+        )
+        off_target_layout.addRow(off_target_settings_title)
+
+        self.pam_edit = QLineEdit("NGG")
+        self.pam_edit.setPlaceholderText("Available after generating mismatches")
+        off_target_layout.addRow("PAM Sequence:", self.pam_edit)
+
+        self.mismatches_combo = QComboBox()
+        self.mismatches_combo.addItems(["0", "1", "2"])
+        self.mismatches_combo.setCurrentText("1")
+        off_target_layout.addRow("Off-target Tolerance:", self.mismatches_combo)
+
+        self.pam_direction_combo = QComboBox()
+        self.pam_direction_combo.addItems(["upstream", "downstream"])
+        self.pam_direction_combo.setCurrentText("downstream")
+        off_target_layout.addRow("PAM Direction:", self.pam_direction_combo)
+
+        main_layout.addWidget(self.off_target_settings_box)
+
+        # Genome file section
+        genome_layout = QHBoxLayout()
+        self.genome_input = QLineEdit()
+        self.genome_input.setPlaceholderText(
+            "Select genome file (enabled after generating mismatches)"
+        )
+        self.genome_input.setEnabled(False)
+
+        # Make browse_genome_btn a class attribute
+        self.browse_genome_btn = QPushButton("Browse")
+        self.browse_genome_btn.clicked.connect(self.browse_genome_file)
+        self.browse_genome_btn.setEnabled(False)
+
+        genome_layout.addWidget(self.genome_input)
+        genome_layout.addWidget(self.browse_genome_btn)
+
+        # Style disabled genome components
+        self.genome_input.setStyleSheet(
+            """
+            QLineEdit:disabled {
+                background-color: #f0f0f0;
+                color: #999999;
+            }
+        """
+        )
+
+        self.browse_genome_btn.setStyleSheet(
+            """
+            QPushButton:disabled {
+                background-color: #f0f0f0;
+                color: #999999;
+            }
+        """
+        )
+
+        # Check Off-targets button
+        self.check_offtargets_btn = QPushButton("Remove off-targets")
+        self.check_offtargets_btn.setEnabled(False)
+        self.check_offtargets_btn.clicked.connect(
+            self.check_offtargets
+        )  # Add this line
+        self.check_offtargets_btn.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #17a2b8;
+                color: white;
+                padding: 10px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #138496;
+            }
+            QPushButton:disabled {
+                background-color: #f0f0f0;
+                color: #999999;
+                border: 1px solid #cccccc;
+            }
+        """
+        )
+
+        genome_layout.addWidget(self.check_offtargets_btn)
+
+        # Create container for genome selection
+        genome_container = QWidget()
+        genome_container.setLayout(genome_layout)
+        main_layout.addWidget(genome_container)
+
+        # Move save controls here (after genome container)
+        save_layout = QHBoxLayout()
         self.output_file = QLineEdit()
         self.output_file.setPlaceholderText("Output file path")
-
-        # Save button
         self.save_btn = QPushButton("Save")
         self.save_btn.setEnabled(False)
         self.save_btn.setStyleSheet(
@@ -187,11 +316,9 @@ class MismatchDesignerGUI(QWidget):
         """
         )
         self.save_btn.clicked.connect(self.save_mismatches)
-
         save_layout.addWidget(self.output_file)
         save_layout.addWidget(self.save_btn)
 
-        # Create a container widget for the save layout
         save_container = QWidget()
         save_container.setLayout(save_layout)
         main_layout.addWidget(save_container)
@@ -264,11 +391,26 @@ class MismatchDesignerGUI(QWidget):
             # Get list of genes
             genes = self.genes_input.toPlainText().strip().split("\n")
 
+            # Calculate total operations for progress bar
+            total_guides = len(genes) * self.guides_per_gene.value()
+            total_operations = total_guides * self.num_variants.value()
+
+            # Create and configure progress dialog
+            progress = QProgressDialog(
+                "Generating mismatches...", "Cancel", 0, total_operations, self
+            )
+            progress.setWindowModality(Qt.WindowModal)
+            progress.setMinimumDuration(0)
+            progress.setValue(0)
+
             # Filter for requested genes and sort by offset
             selected_guides = []
-            num_guides = self.guides_per_gene.value()  # Get the integer value
+            processed_count = 0
 
             for gene in genes:
+                if progress.wasCanceled():
+                    return
+
                 gene_guides = data[
                     (
                         data["locus_tag"].str.contains(gene)
@@ -277,14 +419,16 @@ class MismatchDesignerGUI(QWidget):
                     & (data["mismatches"] == 0)
                 ].sort_values("offset")
 
-                # Take the specified number of guides using integer value
-                selected_guides.append(gene_guides.head(num_guides))
+                # Take the specified number of guides
+                selected_guides.append(gene_guides.head(self.guides_per_gene.value()))
+                processed_count += self.guides_per_gene.value()
+                progress.setValue(processed_count)
+
+            if not selected_guides:
+                raise ValueError("No matching guides found for the specified genes")
 
             # Combine all selected guides
-            if selected_guides:
-                selected_guides = pd.concat(selected_guides)
-            else:
-                raise ValueError("No matching guides found for the specified genes")
+            selected_guides = pd.concat(selected_guides)
 
             # Use temporary file for intermediate step
             with tempfile.NamedTemporaryFile(
@@ -292,7 +436,7 @@ class MismatchDesignerGUI(QWidget):
             ) as tmp_file:
                 selected_guides.to_csv(tmp_file.name, sep="\t", index=False)
 
-                # Run mismatch.py
+                # Configure and run mismatch.py with progress monitoring
                 cmd = [
                     "python",
                     "mismatch.py",
@@ -302,27 +446,63 @@ class MismatchDesignerGUI(QWidget):
                     str(self.num_variants.value()),
                 ]
 
-                # Capture output in memory instead of writing to file
-                process = subprocess.run(
+                process = subprocess.Popen(
                     cmd,
                     stdin=open(tmp_file.name),
-                    capture_output=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                     text=True,
-                    check=True,
+                    bufsize=1,
+                    universal_newlines=True,
                 )
 
-            # Store the results in memory
-            self.generated_mismatches = pd.read_csv(StringIO(process.stdout), sep="\t")
+                # Buffer for collecting output
+                output_buffer = StringIO()
 
-            # Filter out the original guides (where mismatches == 0)
+                while True:
+                    if progress.wasCanceled():
+                        process.terminate()
+                        return
+
+                    line = process.stdout.readline()
+                    if not line and process.poll() is not None:
+                        break
+
+                    output_buffer.write(line)
+                    # Update progress based on processed variants
+                    if line.strip():  # Only count non-empty lines
+                        processed_count += 1
+                        progress.setValue(min(processed_count, total_operations))
+
+                # Check for errors
+                if process.returncode != 0:
+                    raise subprocess.CalledProcessError(
+                        process.returncode, cmd, process.stderr.read()
+                    )
+
+            # Store the results in memory
+            output_buffer.seek(0)
+            self.generated_mismatches = pd.read_csv(output_buffer, sep="\t")
+            output_buffer.close()
+
+            # Filter out the original guides
             self.generated_mismatches = self.generated_mismatches[
                 self.generated_mismatches["mismatches"] > 0
             ]
 
-            # Enable save button
+            # Enable buttons and update UI with clearer titles
             self.save_btn.setEnabled(True)
+            self.check_offtargets_btn.setEnabled(True)
+            self.off_target_settings_box.setEnabled(True)
+            self.genome_input.setEnabled(True)
+            self.genome_input.setPlaceholderText(
+                "Select genome file for off-target analysis"
+            )
+            self.browse_genome_btn.setEnabled(True)  # Updated reference
+            self.off_target_settings_box.findChild(QLabel).setText(
+                "Off-target Settings"
+            )
 
-            # Update table with results
             self.update_table_with_results()
 
             QMessageBox.information(
@@ -333,6 +513,8 @@ class MismatchDesignerGUI(QWidget):
 
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
+        finally:
+            progress.close()
 
     def update_table_with_results(self):
         """Update the table with generated mismatches"""
@@ -377,6 +559,150 @@ class MismatchDesignerGUI(QWidget):
 
         self.adjustSize()
 
+    def browse_genome_file(self):
+        dialog = PreviewFileDialog(self)
+        dialog.setFileMode(QFileDialog.ExistingFile)
+        dialog.setNameFilters(["GenBank Files (*.gb *.gbk)", "All Files (*)"])
+        if dialog.exec_():
+            chosen = dialog.selectedFiles()
+            if chosen:
+                self.genome_input.setText(chosen[0])
+                self.check_offtargets_btn.setEnabled(True)
+
+    def check_offtargets(self):
+        """Check for off-targets in the generated mismatches"""
+        if self.generated_mismatches is None:
+            QMessageBox.warning(self, "No Data", "Generate mismatches first.")
+            return
+
+        genome_file = self.genome_input.text()
+        if not genome_file:
+            QMessageBox.warning(
+                self, "No Genome File", "Please select a genome file first."
+            )
+            return
+
+        try:
+            # Create temporary FASTA file from spacer column
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".fasta", delete=False
+            ) as temp_fasta:
+                for idx, row in self.generated_mismatches.iterrows():
+                    spacer = row["spacer"]
+                    temp_fasta.write(f">{spacer}\n{spacer}\n")
+                temp_fasta_path = temp_fasta.name
+
+            # Create progress dialog
+            self.progress = QProgressDialog(
+                "Checking off-targets...",
+                "Cancel",
+                0,
+                len(self.generated_mismatches),
+                self,
+            )
+            self.progress.setWindowModality(Qt.WindowModal)
+            self.progress.canceled.connect(self.cancel_process)
+            self.progress.show()
+
+            # Set up QProcess
+            self.process = QProcess(self)
+            self.process.setProcessChannelMode(QProcess.SeparateChannels)
+            self.stdout_buffer = StringIO()
+            self.process.readyReadStandardOutput.connect(self.handle_stdout)
+            self.process.readyReadStandardError.connect(self.handle_stderr)
+            self.process.finished.connect(self.offtarget_process_finished)
+
+            # Get values from UI settings
+            pam_sequence = self.pam_edit.text()
+            mismatches = self.mismatches_combo.currentText()
+            pam_direction = self.pam_direction_combo.currentText()
+
+            # Run targets.py with values from settings
+            cmd = [
+                sys.executable,
+                "targets.py",
+                temp_fasta_path,  # sgrna_file
+                genome_file,  # genome_file
+                pam_sequence,  # pam from UI
+                mismatches,  # mismatches from UI
+                "--pam-direction",
+                pam_direction,  # direction from UI
+            ]
+
+            self.temp_fasta_path = temp_fasta_path
+            self.process.start(cmd[0], cmd[1:])
+
+        except Exception as e:
+            self.cleanup()
+            QMessageBox.critical(
+                self, "Error", f"Failed to start off-target check:\n{str(e)}"
+            )
+
+    def handle_stdout(self):
+        """Handle process stdout"""
+        output = self.process.readAllStandardOutput().data().decode("utf-8")
+        self.stdout_buffer.write(output)
+
+    def handle_stderr(self):
+        """Handle process stderr"""
+        stderr = self.process.readAllStandardError().data().decode()
+        if stderr:
+            print(stderr, file=sys.stderr)
+
+    def cancel_process(self):
+        """Cancel the running process"""
+        if self.process and self.process.state() != QProcess.NotRunning:
+            self.process.kill()
+        self.cleanup()
+
+    def cleanup(self):
+        """Clean up temporary files"""
+        if hasattr(self, "temp_fasta_path") and os.path.exists(self.temp_fasta_path):
+            try:
+                os.unlink(self.temp_fasta_path)
+            except:
+                pass
+
+    def offtarget_process_finished(self):
+        """Handle completion of off-target checking"""
+        self.progress.close()
+        try:
+            # Reset buffer position and read results
+            self.stdout_buffer.seek(0)
+            off_target_data = pd.read_csv(self.stdout_buffer, sep="\t")
+            self.stdout_buffer.close()
+
+            # Filter out guides with multiple sites
+            unique_targets = off_target_data[off_target_data["sites"] == 1]
+
+            # Store counts for message
+            initial_count = len(self.generated_mismatches)
+
+            # Update the generated mismatches
+            self.generated_mismatches = self.generated_mismatches[
+                self.generated_mismatches["spacer"].isin(unique_targets["spacer"])
+            ]
+
+            remaining_count = len(self.generated_mismatches)
+            removed_count = initial_count - remaining_count
+
+            # Update the table display
+            self.update_table_with_results()
+
+            QMessageBox.information(
+                self,
+                "Off-target Check Complete",
+                f"Removed {removed_count} guides with off-targets.\n"
+                f"Retained {remaining_count} guides with unique targets.",
+            )
+
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Error", f"Failed to process off-target results:\n{str(e)}"
+            )
+        finally:
+            self.cleanup()
+
     def save_mismatches(self):
         """Save the generated mismatches to file"""
         if self.generated_mismatches is None:
@@ -403,6 +729,24 @@ class MismatchDesignerGUI(QWidget):
                 )
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to save file:\n{str(e)}")
+
+    def load_genes_with_preview(self):
+        dialog = PreviewFileDialog(self)
+        dialog.setFileMode(QFileDialog.ExistingFile)
+        dialog.setNameFilters(["Text Files (*.txt)", "All Files (*)"])
+        if dialog.exec_():
+            chosen = dialog.selectedFiles()
+            if chosen:
+                file_path = chosen[0]
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        file_content = f.read().strip()
+                    self.genes_input.setPlainText(file_content)
+                    self.genes_file_input.setText(
+                        file_path
+                    )  # Update the file path display
+                except Exception as e:
+                    QMessageBox.warning(self, "Error", f"Failed to load file: {str(e)}")
 
 
 def main():
