@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import (
     QStackedWidget,
     QStyle,
     QLineEdit,
+    QMessageBox,
 )
 from PyQt5.QtGui import QIcon, QPixmap, QPalette, QColor
 from PyQt5.QtCore import Qt
@@ -60,6 +61,26 @@ class MainWindow(QMainWindow):
     def create_welcome_page(self):
         page = QWidget()
         layout = QVBoxLayout()
+
+        # Add Git Pull button at the top
+        git_pull_btn = QPushButton("Update Software (Git Pull)")
+        git_pull_btn.clicked.connect(self.perform_git_pull)
+        git_pull_btn.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #6c757d;
+                color: white;
+                padding: 10px;
+                border-radius: 4px;
+                font-weight: bold;
+                max-width: 200px;
+            }
+            QPushButton:hover {
+                background-color: #5a6268;
+            }
+        """
+        )
+        layout.addWidget(git_pull_btn, alignment=Qt.AlignRight)
 
         # Welcome message
         welcome_label = QLabel("Welcome to Barcoder Suite")
@@ -133,6 +154,35 @@ class MainWindow(QMainWindow):
 
         page.setLayout(layout)
         return page
+
+    def perform_git_pull(self):
+        try:
+            import subprocess
+
+            result = subprocess.run(
+                ["git", "pull"], capture_output=True, text=True, check=True
+            )
+            QMessageBox.information(
+                self,
+                "Git Pull Complete",
+                f"Successfully updated software:\n{result.stdout}",
+            )
+            # Recommend restart
+            restart = QMessageBox.question(
+                self,
+                "Restart Required",
+                "Software has been updated. Would you like to restart the application?",
+                QMessageBox.Yes | QMessageBox.No,
+            )
+            if restart == QMessageBox.Yes:
+                QApplication.quit()
+                subprocess.Popen([sys.executable] + sys.argv)
+        except subprocess.CalledProcessError as e:
+            QMessageBox.critical(
+                self, "Git Pull Failed", f"Failed to update software:\n{e.stderr}"
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"An error occurred:\n{str(e)}")
 
     def create_tool_button(self, title, description, callback):
         button = QPushButton()
