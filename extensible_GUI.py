@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
     QStyle,
     QLineEdit,
     QMessageBox,
+    QHBoxLayout,
 )
 from PyQt5.QtGui import QIcon, QPixmap, QPalette, QColor
 from PyQt5.QtCore import Qt
@@ -62,7 +63,33 @@ class MainWindow(QMainWindow):
         page = QWidget()
         layout = QVBoxLayout()
 
-        # Git Pull button at the top
+        # Create top button row
+        top_buttons = QHBoxLayout()
+
+        # Relaunch button on the left
+        relaunch_btn = QPushButton("Relaunch Application")
+        relaunch_btn.clicked.connect(self.relaunch_app)
+        relaunch_btn.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #6c757d;
+                color: white;
+                padding: 10px;
+                border-radius: 4px;
+                font-weight: bold;
+                max-width: 200px;
+            }
+            QPushButton:hover {
+                background-color: #5a6268;
+            }
+        """
+        )
+        top_buttons.addWidget(relaunch_btn, alignment=Qt.AlignLeft)
+
+        # Add stretch to push buttons to opposite sides
+        top_buttons.addStretch()
+
+        # Git Pull button on the right
         git_pull_btn = QPushButton("Update Software (Git Pull)")
         git_pull_btn.clicked.connect(self.perform_git_pull)
         git_pull_btn.setStyleSheet(
@@ -80,44 +107,10 @@ class MainWindow(QMainWindow):
             }
         """
         )
-        layout.addWidget(git_pull_btn, alignment=Qt.AlignRight)
+        top_buttons.addWidget(git_pull_btn, alignment=Qt.AlignRight)
 
-        # Welcome message
-        welcome_label = QLabel("Welcome to Barcoder Suite")
-        welcome_label.setAlignment(Qt.AlignCenter)
-        welcome_label.setStyleSheet("font-size: 24px; margin: 20px;")
-
-        # Try to load and display logo
-        logo_path = os.path.join(
-            os.path.dirname(__file__), "assets", "barcoder_logo.png"
-        )
-        if os.path.exists(logo_path):
-            logo_label = QLabel()
-            pixmap = QPixmap(logo_path)
-            scaled_pixmap = pixmap.scaled(
-                200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
-            logo_label.setPixmap(scaled_pixmap)
-            logo_label.setAlignment(Qt.AlignCenter)
-            layout.addWidget(logo_label)
-
-        # Load and display icon in the GUI
-        icon_path = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)), "assets", "barcoder_icon.png"
-        )
-        if os.path.exists(icon_path):
-            icon_label = QLabel()
-            pixmap = QPixmap(icon_path)
-            scaled_pixmap = pixmap.scaled(
-                100, 100, Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
-            icon_label.setPixmap(scaled_pixmap)
-            icon_label.setAlignment(Qt.AlignCenter)
-            layout.addWidget(icon_label)
-        else:
-            print(f"Icon not found at: {icon_path}")
-
-        layout.addWidget(welcome_label)
+        # Add the top button row to main layout
+        layout.addLayout(top_buttons)
 
         # Create a container widget for buttons with center alignment
         button_container = QWidget()
@@ -269,6 +262,20 @@ class MainWindow(QMainWindow):
         )
 
         return button
+
+    def relaunch_app(self):
+        """Relaunch the application"""
+        try:
+            import subprocess
+
+            QApplication.quit()
+            subprocess.Popen([sys.executable] + sys.argv)
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Error", f"Failed to relaunch application:\n{str(e)}"
+            )
+            # If relaunch fails, don't quit the current instance
+            return
 
 
 def main():
