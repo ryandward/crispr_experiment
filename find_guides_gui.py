@@ -120,8 +120,9 @@ class FindGuidesGUI(QWidget):
         find_guides_layout.addRow(QLabel("Barcode Length"), self.barcode_edit)
 
         self.mismatches_combo = QComboBox()
-        self.mismatches_combo.addItems(["0", "1", "2"])
-        find_guides_layout.addRow(QLabel("Mismatches"), self.mismatches_combo)
+        self.mismatches_combo.addItems(["0", "1", "2", "3"])  # Add "3" to options
+        self.mismatches_combo.setCurrentText("3")  # Set default to "3"
+        find_guides_layout.addRow(QLabel("Off-target Tolerance"), self.mismatches_combo)
 
         self.pam_direction_combo = QComboBox()
         self.pam_direction_combo.addItems(["upstream", "downstream"])
