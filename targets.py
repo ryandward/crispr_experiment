@@ -597,6 +597,7 @@ def run_bowtie_and_parse(
                     "bowtie",
                     "-S",
                     "-k 100",
+                    "--best",
                     "--nomaqround",
                     "-p",
                     str(num_threads),
@@ -611,7 +612,7 @@ def run_bowtie_and_parse(
                 bowtie_process = subprocess.Popen(
                     bowtie_command,
                     stdout=subprocess.PIPE,
-                    stderr=devnull,
+                    # stderr=devnull,
                     universal_newlines=True,
                 )
 
