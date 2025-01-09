@@ -213,8 +213,8 @@ class MismatchDesignerGUI(QWidget):
         off_target_layout.addRow("PAM Sequence:", self.pam_edit)
 
         self.mismatches_combo = QComboBox()
-        self.mismatches_combo.addItems(["0", "1", "2"])
-        self.mismatches_combo.setCurrentText("1")
+        self.mismatches_combo.addItems(["0", "1", "2", "3"])  # Add "3" to options
+        self.mismatches_combo.setCurrentText("3")  # Set default to "3"
         off_target_layout.addRow("Off-target Tolerance:", self.mismatches_combo)
 
         self.pam_direction_combo = QComboBox()
