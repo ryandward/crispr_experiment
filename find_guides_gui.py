@@ -82,6 +82,7 @@ class FindGuidesGUI(QWidget):
         self.stdout_buffer = StringIO()  # Buffer to collect all stdout
         self.headers = []  # Store headers
         self.filter_widget = None  # Add this
+        self.current_display_limit = 1000  # Add this line
         self.initUI()
 
     def initUI(self):
@@ -185,6 +186,51 @@ class FindGuidesGUI(QWidget):
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.table.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
         main_layout.addWidget(self.table)
+
+        # Add buttons layout after the table
+        buttons_layout = QHBoxLayout()
+
+        self.load_more_btn = QPushButton("Load More")
+        self.load_more_btn.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #6c757d;
+                color: white;
+                padding: 8px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #5a6268;
+            }
+        """
+        )
+        self.load_more_btn.clicked.connect(self.load_more_data)
+        self.load_more_btn.hide()  # Hidden by default
+
+        self.load_all_btn = QPushButton("Load All")
+        self.load_all_btn.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #6c757d;
+                color: white;
+                padding: 8px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #5a6268;
+            }
+        """
+        )
+        self.load_all_btn.clicked.connect(self.load_all_data)
+        self.load_all_btn.hide()  # Hidden by default
+
+        buttons_layout.addWidget(self.load_more_btn)
+        buttons_layout.addWidget(self.load_all_btn)
+        buttons_layout.addStretch()
+
+        main_layout.addLayout(buttons_layout)
 
         self.setLayout(main_layout)
 
@@ -379,14 +425,29 @@ class FindGuidesGUI(QWidget):
             filter_layout.addRow("Gene Body Overlap:", overlap_layout)
             filter_layout.addRow("Gene Body Offset:", offset_layout)
 
-            # Add guides per gene filter
+            # Add guides per gene filter with selection method
+            guides_per_gene_layout = QHBoxLayout()
+
             self.guides_per_gene = QSpinBox()
             self.guides_per_gene.setRange(0, 100)
             self.guides_per_gene.setValue(0)  # 0 means no limit
             self.guides_per_gene.setSpecialValueText(
                 "All"
             )  # Show "All" when value is 0
-            filter_layout.addRow("Guides per gene:", self.guides_per_gene)
+
+            self.guide_selection_method = QComboBox()
+            self.guide_selection_method.addItems(
+                [
+                    "First N Guides",
+                    "Last N Guides",
+                    "N Guides Distributed Evenly",
+                    "Random N Guides",
+                ]
+            )
+
+            guides_per_gene_layout.addWidget(self.guides_per_gene)
+            guides_per_gene_layout.addWidget(self.guide_selection_method)
+            filter_layout.addRow("Guides per gene:", guides_per_gene_layout)
 
             filter_layout.addRow(self.apply_filters_btn)
             filter_layout.addRow(self.save_button)
@@ -425,11 +486,11 @@ class FindGuidesGUI(QWidget):
         self.max_overlap.setEnabled(not state)
 
     def display_all_data(self):
-        """Display first 1000 rows of sorted data"""
+        """Display data up to current limit"""
         self.table.setRowCount(0)
 
-        # Group by locus_tag and take first 1000 rows
-        displayed_data = self.all_data.head(1000)
+        # Get data up to current limit
+        displayed_data = self.all_data.head(self.current_display_limit)
 
         current_locus = None
         use_alternate_color = False
@@ -472,6 +533,24 @@ class FindGuidesGUI(QWidget):
             self.parent().adjustSize()
 
         self.adjustSize()
+
+        # Show/hide load buttons based on remaining data
+        remaining_rows = len(self.all_data) - self.current_display_limit
+        self.load_more_btn.setVisible(remaining_rows > 0)
+        self.load_all_btn.setVisible(remaining_rows > 0)
+
+        if remaining_rows > 0:
+            self.load_more_btn.setText(f"Load More ({remaining_rows:,} remaining)")
+
+    def load_more_data(self):
+        """Double the number of displayed rows"""
+        self.current_display_limit *= 2
+        self.display_all_data()
+
+    def load_all_data(self):
+        """Display all available rows"""
+        self.current_display_limit = len(self.all_data)
+        self.display_all_data()
 
     def apply_filters(self):
         if self.all_data is None:
@@ -563,7 +642,26 @@ class FindGuidesGUI(QWidget):
             total_groups = len(filtered_data.groupby("locus_tag"))
 
             for idx, (_, group) in enumerate(filtered_data.groupby("locus_tag")):
-                filtered_groups.append(group.head(guides_limit))
+                selection_method = self.guide_selection_method.currentText()
+
+                if selection_method == "First N Guides":
+                    filtered_groups.append(group.head(guides_limit))
+                elif selection_method == "Last N Guides":
+                    filtered_groups.append(group.tail(guides_limit))
+                elif selection_method == "Random N Guides":
+                    if len(group) >= guides_limit:
+                        filtered_groups.append(group.sample(n=guides_limit))
+                    else:
+                        filtered_groups.append(group)
+                elif selection_method == "N Guides Distributed Evenly":
+                    if len(group) >= guides_limit:
+                        # Calculate indices for evenly distributed guides
+                        step = len(group) / guides_limit
+                        indices = [int(i * step) for i in range(guides_limit)]
+                        filtered_groups.append(group.iloc[indices])
+                    else:
+                        filtered_groups.append(group)
+
                 progress.setValue(90 + (8 * idx // total_groups))
                 if progress.wasCanceled():
                     return
@@ -575,9 +673,20 @@ class FindGuidesGUI(QWidget):
         filtered_data = filtered_data.sort_values(["locus_tag", "offset"])
         self.current_filtered_data = filtered_data
 
-        # Update table with first 1000 rows
-        self.update_table_with_data(filtered_data.head(1000))
+        # Reset display limit when applying new filters
+        self.current_display_limit = 1000
+
+        # Update table with rows up to current limit
+        self.update_table_with_data(filtered_data.head(self.current_display_limit))
         progress.setValue(100)
+
+        # Show/hide load buttons based on remaining data
+        remaining_rows = len(filtered_data) - self.current_display_limit
+        self.load_more_btn.setVisible(remaining_rows > 0)
+        self.load_all_btn.setVisible(remaining_rows > 0)
+
+        if remaining_rows > 0:
+            self.load_more_btn.setText(f"Load More ({remaining_rows:,} remaining)")
 
         # Update filter results count
         self.filter_results_label.setText(
