@@ -82,6 +82,7 @@ def create_locus_map(genbank_file_name):
         {},
         {},
     )
+    feature_types = {}  # Add dictionary to store feature types
 
     with open(genbank_file_name, "rt") as input_handle:
         for record in SeqIO.parse(input_handle, "genbank"):
@@ -94,9 +95,14 @@ def create_locus_map(genbank_file_name):
             overhang_length = 100_000 if topologies[record.id] == "circular" else 0
 
             for feature in record.features:
+                locus_tag = feature.qualifiers.get("locus_tag", [None])[0]
+                if locus_tag and feature.type != "gene":  # Skip 'gene' type
+                    if locus_tag not in feature_types:
+                        feature_types[locus_tag] = set()
+                    feature_types[locus_tag].add(feature.type)
+
                 if feature.type == "gene":
                     gene_count += 1
-                    locus_tag = feature.qualifiers.get("locus_tag", [None])[0]
                     gene_name = feature.qualifiers.get("gene", [None])[0]
 
                     if isinstance(feature.location, CompoundLocation):
@@ -196,7 +202,7 @@ def create_locus_map(genbank_file_name):
 
             all_genes[record.id] = gene_count
 
-    return locus_map, organisms, seq_lens, topologies, all_genes
+    return locus_map, organisms, seq_lens, topologies, all_genes, feature_types
 
 
 def get_true_chrom_lengths(gb_file):
@@ -675,8 +681,8 @@ def main(args):
             sys.exit(1)
 
         console.log("Generating topological coordinate maps...")
-        locus_map, organisms, seq_lens, topologies, all_genes = create_locus_map(
-            args.genome_file
+        locus_map, organisms, seq_lens, topologies, all_genes, feature_types = (
+            create_locus_map(args.genome_file)
         )
 
         create_topological_fasta(args.genome_file, topological_fasta_file_name)
@@ -699,6 +705,11 @@ def main(args):
     try:
         console.log("Finding matches...")
         results = pd.DataFrame(results).drop_duplicates()
+
+        # Add feature types to results
+        results["feature_types"] = results["locus_tag"].map(
+            lambda x: ",".join(sorted(feature_types.get(x, []))) if x else None
+        )
 
         try:
             results = filter_offtargets_by_pam(results)
@@ -768,7 +779,7 @@ def main(args):
         stats = stats.fillna(0).astype(int)
         results = results.merge(stats, left_on="spacer", right_index=True, how="left")
 
-        column_order = ["spacer", "locus_tag", "gene", "chr"]
+        column_order = ["spacer", "locus_tag", "gene", "feature_types", "chr"]
         if not (results["pam"].isnull().all() or results["pam"].nunique() == 1):
             column_order.append("pam")
 
