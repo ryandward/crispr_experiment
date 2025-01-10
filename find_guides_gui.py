@@ -378,6 +378,16 @@ class FindGuidesGUI(QWidget):
             )
             filter_layout.addRow("Gene Body Overlap:", overlap_layout)
             filter_layout.addRow("Gene Body Offset:", offset_layout)
+
+            # Add guides per gene filter
+            self.guides_per_gene = QSpinBox()
+            self.guides_per_gene.setRange(0, 100)
+            self.guides_per_gene.setValue(0)  # 0 means no limit
+            self.guides_per_gene.setSpecialValueText(
+                "All"
+            )  # Show "All" when value is 0
+            filter_layout.addRow("Guides per gene:", self.guides_per_gene)
+
             filter_layout.addRow(self.apply_filters_btn)
             filter_layout.addRow(self.save_button)
 
@@ -544,6 +554,21 @@ class FindGuidesGUI(QWidget):
 
             filtered_data = pd.DataFrame(non_overlapping)
         progress.setValue(90)
+
+        # Apply guides per gene filter as the final step
+        guides_limit = self.guides_per_gene.value()
+        if guides_limit > 0:
+            progress.setLabelText("Applying guides per gene limit...")
+            filtered_groups = []
+            total_groups = len(filtered_data.groupby("locus_tag"))
+
+            for idx, (_, group) in enumerate(filtered_data.groupby("locus_tag")):
+                filtered_groups.append(group.head(guides_limit))
+                progress.setValue(90 + (8 * idx // total_groups))
+                if progress.wasCanceled():
+                    return
+
+            filtered_data = pd.concat(filtered_groups)
 
         # Sort and store filtered data
         progress.setLabelText("Finalizing results...")
