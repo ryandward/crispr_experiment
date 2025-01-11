@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import (
     QGridLayout,
     QTextEdit,
 )
-from PyQt5.QtCore import Qt, QRegExp, QProcess, QDir
+from PyQt5.QtCore import Qt, QRegExp, QProcess
 from PyQt5.QtGui import QRegExpValidator, QColor, QPixmap
 import csv
 import pandas as pd
@@ -35,11 +35,6 @@ class PreviewFileDialog(QFileDialog):
         super().__init__(parent)
         self.setOption(QFileDialog.DontUseNativeDialog, True)
         self.setViewMode(QFileDialog.Detail)
-
-        # Force the file filter more strictly
-        self.setNameFilters(["GenBank Files (*.gb *.gbk)"])
-        self.setFilter(self.filter() | QDir.Files)  # Only show files
-        self.setDefaultSuffix("gb")  # Default extension
 
         # Create preview widget with better styling
         self.preview = QTextEdit(self)
@@ -251,9 +246,19 @@ class FindGuidesGUI(QWidget):
     def browse_genome_file(self):
         dialog = PreviewFileDialog(self)
         dialog.setFileMode(QFileDialog.ExistingFile)
+
+        # Set name filters differently for macOS
+        if sys.platform.startswith("darwin"):
+            dialog.setNameFilter("GenBank Files (*.gb *.gbk)")
+            # Forces the filter on macOS
+            dialog.setDefaultSuffix("gb")
+            dialog.setOption(QFileDialog.DontUseNativeDialog, True)
+        else:
+            dialog.setNameFilters(["GenBank Files (*.gb *.gbk)", "All Files (*)"])
+
         if dialog.exec_():
             chosen = dialog.selectedFiles()
-            if chosen and (chosen[0].endswith(".gb") or chosen[0].endswith(".gbk")):
+            if chosen:
                 self.genome_file_edit.setText(chosen[0])
 
     def run_script(self):
