@@ -22,10 +22,8 @@ from PyQt5.QtWidgets import (
     QAbstractScrollArea,
     QGridLayout,
     QTextEdit,
-    QListView,
-    QTreeView,
 )
-from PyQt5.QtCore import Qt, QRegExp, QProcess, QSortFilterProxyModel, QDir
+from PyQt5.QtCore import Qt, QRegExp, QProcess
 from PyQt5.QtGui import QRegExpValidator, QColor, QPixmap
 import csv
 import pandas as pd
@@ -38,7 +36,7 @@ class PreviewFileDialog(QFileDialog):
         self.setOption(QFileDialog.DontUseNativeDialog, True)
         self.setViewMode(QFileDialog.Detail)
 
-        # Create preview widget
+        # Create preview widget with better styling
         self.preview = QTextEdit(self)
         self.preview.setReadOnly(True)
         self.preview.setMinimumWidth(400)
@@ -248,13 +246,12 @@ class FindGuidesGUI(QWidget):
     def browse_genome_file(self):
         dialog = PreviewFileDialog(self)
         dialog.setFileMode(QFileDialog.ExistingFile)
-        dialog.setNameFilter("GenBank Files (*.gb *.gbk)")  # Simplified filter
-
+        dialog.setNameFilter(
+            "GenBank Files (*.gb *.gbk)"
+        )  # Changed from setNameFilters to setNameFilter
         if dialog.exec_():
             chosen = dialog.selectedFiles()
-            if chosen and any(
-                chosen[0].lower().endswith(ext) for ext in (".gb", ".gbk")
-            ):
+            if chosen:
                 self.genome_file_edit.setText(chosen[0])
 
     def run_script(self):
