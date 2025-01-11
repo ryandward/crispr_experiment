@@ -246,7 +246,9 @@ class FindGuidesGUI(QWidget):
     def browse_genome_file(self):
         dialog = PreviewFileDialog(self)
         dialog.setFileMode(QFileDialog.ExistingFile)
-        dialog.setNameFilters(["GenBank Files (*.gb)"])  # Only .gb/*.gbk now
+        dialog.setNameFilter(
+            "GenBank Files (*.gb *.gbk)"
+        )  # Single filter string instead of list
         if dialog.exec_():
             chosen = dialog.selectedFiles()
             if chosen:
