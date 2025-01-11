@@ -244,22 +244,11 @@ class FindGuidesGUI(QWidget):
         self.setLayout(main_layout)
 
     def browse_genome_file(self):
-        dialog = PreviewFileDialog(self)
-        dialog.setFileMode(QFileDialog.ExistingFile)
-
-        # Set name filters differently for macOS
-        if sys.platform.startswith("darwin"):
-            dialog.setNameFilter("GenBank Files (*.gb *.gbk)")
-            # Forces the filter on macOS
-            dialog.setDefaultSuffix("gb")
-            dialog.setOption(QFileDialog.DontUseNativeDialog, True)
-        else:
-            dialog.setNameFilters(["GenBank Files (*.gb *.gbk)", "All Files (*)"])
-
-        if dialog.exec_():
-            chosen = dialog.selectedFiles()
-            if chosen:
-                self.genome_file_edit.setText(chosen[0])
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select GenBank File", "", "GenBank Files (*.gb *.gbk)"
+        )
+        if file_path:
+            self.genome_file_edit.setText(file_path)
 
     def run_script(self):
         genome_file = self.genome_file_edit.text().strip()
