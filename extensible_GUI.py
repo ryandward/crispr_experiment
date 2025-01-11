@@ -279,27 +279,56 @@ class MainWindow(QMainWindow):
 
 
 def main():
+    # Force light mode based on platform
+    if sys.platform.startswith("win"):
+        sys.argv += ["-platform", "windows:darkmode=1"]
+    elif sys.platform.startswith("darwin"):  # macOS
+        sys.argv += ["-platform", "cocoa:darkmode=1"]
+    else:  # Linux and others
+        sys.argv += ["-platform", "xcb:darkmode=1"]
+
     # Enable High DPI support
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
+
+    # Force light theme palette
     palette = QPalette()
     palette.setColor(QPalette.Window, QColor("#FFFFFF"))
     palette.setColor(QPalette.WindowText, QColor("#000000"))
+    palette.setColor(QPalette.Base, QColor("#FFFFFF"))
+    palette.setColor(QPalette.AlternateBase, QColor("#F5F5F5"))
+    palette.setColor(QPalette.ToolTipBase, QColor("#FFFFFF"))
+    palette.setColor(QPalette.ToolTipText, QColor("#000000"))
+    palette.setColor(QPalette.Text, QColor("#000000"))
+    palette.setColor(QPalette.Button, QColor("#F0F0F0"))
+    palette.setColor(QPalette.ButtonText, QColor("#000000"))
+    palette.setColor(QPalette.BrightText, QColor("#FF0000"))
+    palette.setColor(QPalette.Link, QColor("#0000FF"))
+    palette.setColor(QPalette.Highlight, QColor("#308CC6"))
+    palette.setColor(QPalette.HighlightedText, QColor("#FFFFFF"))
+
+    # Force the palette on the entire application
     app.setPalette(palette)
 
-    # Set application-wide stylesheet
+    # Set application-wide stylesheet to ensure light theme
     app.setStyleSheet(
         """
-        QMainWindow { background-color: #ffffff; }
+        QWidget {
+            background-color: #ffffff;
+            color: #000000;
+        }
         QLineEdit, QComboBox, QSpinBox, QTextEdit, QPlainTextEdit {
             background-color: #ffffff;
             color: #000000;
             border: 1px solid #dee2e6;
         }
-        QLabel { color: #212529; }
+        QLabel { 
+            color: #212529;
+            background-color: transparent;
+        }
         QPushButton {
             background-color: #f8f9fa;
             color: #000000;
@@ -307,7 +336,25 @@ def main():
         QPushButton:hover {
             background-color: #e9ecef;
         }
-        """
+        QTableWidget {
+            background-color: #ffffff;
+            color: #000000;
+        }
+        QHeaderView::section {
+            background-color: #f8f9fa;
+            color: #000000;
+        }
+        QComboBox QAbstractItemView {
+            background-color: #ffffff;
+            color: #000000;
+        }
+        QMessageBox {
+            background-color: #ffffff;
+        }
+        QProgressDialog {
+            background-color: #ffffff;
+        }
+    """
     )
 
     window = MainWindow()
