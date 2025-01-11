@@ -174,15 +174,24 @@ class FindGuidesGUI(QWidget):
                 font-family: Monospace;
                 font-size: 9pt;
                 color: #000000;
-
             }
             QHeaderView::section {
                 font-family: Monospace;
                 font-size: 9pt;
                 font-weight: bold;
             }
+            QTableWidget::item {
+                padding: 0px;
+                margin: 0px;
+            }
         """
         )
+        # Set minimal row height
+        self.table.verticalHeader().setDefaultSectionSize(
+            16
+        )  # Minimal height for 9pt font
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
+
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.table.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
         main_layout.addWidget(self.table)
@@ -297,7 +306,7 @@ class FindGuidesGUI(QWidget):
         self.stdout_buffer.close()
 
         # Sort the data by locus_tag and offset
-        self.all_data = self.all_data.sort_values(["locus_tag", "offset"])
+        self.all_data = self.all_data.sort_values(["chr", "locus_tag", "offset"])
 
         # Get the max offset value from the data
         max_offset = self.all_data["offset"].max()
@@ -486,46 +495,65 @@ class FindGuidesGUI(QWidget):
         self.max_overlap.setEnabled(not state)
 
     def display_all_data(self):
-        """Display data up to current limit"""
-        self.table.setRowCount(0)
+        """Display data up to current limit with progress dialog"""
+        progress = QProgressDialog(
+            "Loading guides...", "Cancel", 0, self.current_display_limit, self
+        )
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.show()
 
-        # Get data up to current limit
         displayed_data = self.all_data.head(self.current_display_limit)
 
+        # Pre-allocate the table size
+        self.table.setRowCount(len(displayed_data))
+
+        # Prepare all items at once
+        items = []
         current_locus = None
         use_alternate_color = False
 
-        for _, row in displayed_data.iterrows():
-            table_row = self.table.rowCount()
-            self.table.insertRow(table_row)
+        for idx, (_, row) in enumerate(displayed_data.iterrows()):
+            if progress.wasCanceled():
+                break
 
-            # Change background color when locus_tag changes
             if current_locus != row["locus_tag"]:
                 current_locus = row["locus_tag"]
                 use_alternate_color = not use_alternate_color
 
-            background_color = "#e6f3ff" if use_alternate_color else "#ffffff"
+            bg_color = QColor("#e6f3ff" if use_alternate_color else "#ffffff")
 
-            for col_idx, value in enumerate(row):
+            # Create row items
+            row_items = []
+            for value in row:
                 item = QTableWidgetItem(str(value))
-                item.setBackground(QColor(background_color))
-                self.table.setItem(table_row, col_idx, item)
+                item.setBackground(bg_color)
+                row_items.append(item)
+            items.append(row_items)
 
+            progress.setValue(idx + 1)
+
+        # Set all items at once in a batch
+        for row_idx, row_items in enumerate(items):
+            for col_idx, item in enumerate(row_items):
+                self.table.setItem(row_idx, col_idx, item)
+
+        progress.close()
+
+        # Resize columns to fit their contents
         self.table.resizeColumnsToContents()
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        self.table.resizeRowsToContents()
 
-        # Calculate total width needed including margins with extra padding
-        total_width = self.table.horizontalHeader().length() + 20
-
-        # Calculate height for minimum 10 rows plus header
+        # Calculate total width and height needed
+        total_width = (
+            sum(self.table.columnWidth(i) for i in range(self.table.columnCount())) + 20
+        )
         header_height = self.table.horizontalHeader().height()
-        row_height = self.table.rowHeight(0)  # Get height of first row
-        min_table_height = header_height + (row_height * 10)
+        row_height = self.table.verticalHeader().defaultSectionSize()
+        min_table_height = header_height + (row_height * 10)  # Height for 10 rows
 
-        # Set minimum sizes for both table and widget
+        # Set minimum sizes
         self.table.setMinimumSize(total_width, min_table_height)
-        self.setMinimumWidth(total_width + 50)  # Additional padding for widget
+        self.setMinimumWidth(total_width + 50)  # Add padding for widget
 
         # Force layout update
         self.updateGeometry()
@@ -543,14 +571,120 @@ class FindGuidesGUI(QWidget):
             self.load_more_btn.setText(f"Load More ({remaining_rows:,} remaining)")
 
     def load_more_data(self):
-        """Double the number of displayed rows"""
-        self.current_display_limit *= 2
-        self.display_all_data()
+        """Double the number of displayed rows with batch processing"""
+        # Show indefinite progress dialog
+        progress = QProgressDialog("Loading more data...", None, 0, 0)
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setRange(0, 0)  # Makes it an indefinite progress dialog
+        progress.show()
+
+        source_data = (
+            self.current_filtered_data
+            if hasattr(self, "current_filtered_data")
+            else self.all_data
+        )
+
+        prev_limit = self.current_display_limit
+        new_limit = min(self.current_display_limit * 2, len(source_data))
+
+        # Get new data slice and prepare batch
+        new_data = source_data.iloc[prev_limit:new_limit]
+        current_rows = self.table.rowCount()
+        self.table.setRowCount(current_rows + len(new_data))
+
+        # Prepare all items in memory first
+        current_locus = (
+            self.table.item(current_rows - 1, 1).text() if current_rows > 0 else None
+        )
+        use_alternate_color = bool(current_rows % 2)
+
+        # Create all items at once
+        items_batch = []
+        for _, row in new_data.iterrows():
+            if current_locus != row["locus_tag"]:
+                current_locus = row["locus_tag"]
+                use_alternate_color = not use_alternate_color
+
+            bg_color = QColor("#e6f3ff" if use_alternate_color else "#ffffff")
+            row_items = []
+            for value in row:
+                item = QTableWidgetItem(str(value))
+                item.setBackground(bg_color)
+                row_items.append(item)
+            items_batch.append(row_items)
+
+        # Set all items in a single batch
+        for idx, row_items in enumerate(items_batch):
+            for col_idx, item in enumerate(row_items):
+                self.table.setItem(current_rows + idx, col_idx, item)
+
+        self.current_display_limit = new_limit
+
+        # Update load buttons
+        remaining_rows = len(source_data) - self.current_display_limit
+        self.load_more_btn.setVisible(remaining_rows > 0)
+        self.load_all_btn.setVisible(remaining_rows > 0)
+        if remaining_rows > 0:
+            self.load_more_btn.setText(f"Load More ({remaining_rows:,} remaining)")
+
+        # Close progress dialog at the end
+        progress.close()
 
     def load_all_data(self):
-        """Display all available rows"""
-        self.current_display_limit = len(self.all_data)
-        self.display_all_data()
+        """Load all remaining data in a single batch"""
+        # Show indefinite progress dialog
+        progress = QProgressDialog("Loading all data...", None, 0, 0)
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setRange(0, 0)  # Makes it an indefinite progress dialog
+        progress.show()
+
+        source_data = (
+            self.current_filtered_data
+            if hasattr(self, "current_filtered_data")
+            else self.all_data
+        )
+        if len(source_data) <= self.current_display_limit:
+            return
+
+        # Get remaining data and prepare batch
+        new_data = source_data.iloc[self.current_display_limit :]
+        current_rows = self.table.rowCount()
+        self.table.setRowCount(current_rows + len(new_data))
+
+        # Prepare all items in memory
+        current_locus = (
+            self.table.item(current_rows - 1, 1).text() if current_rows > 0 else None
+        )
+        use_alternate_color = bool(current_rows % 2)
+
+        # Create all items at once
+        items_batch = []
+        for _, row in new_data.iterrows():
+            if current_locus != row["locus_tag"]:
+                current_locus = row["locus_tag"]
+                use_alternate_color = not use_alternate_color
+
+            bg_color = QColor("#e6f3ff" if use_alternate_color else "#ffffff")
+            row_items = []
+            for value in row:
+                item = QTableWidgetItem(str(value))
+                item.setBackground(bg_color)
+                row_items.append(item)
+            items_batch.append(row_items)
+
+        # Set all items in a single batch
+        for idx, row_items in enumerate(items_batch):
+            for col_idx, item in enumerate(row_items):
+                self.table.setItem(current_rows + idx, col_idx, item)
+
+        self.current_display_limit = len(source_data)
+
+        # Hide load buttons
+        self.load_more_btn.setVisible(False)
+        self.load_all_btn.setVisible(False)
+
+        # Close progress dialog at the end
+        progress.close()
 
     def apply_filters(self):
         if self.all_data is None:
@@ -670,7 +804,7 @@ class FindGuidesGUI(QWidget):
 
         # Sort and store filtered data
         progress.setLabelText("Finalizing results...")
-        filtered_data = filtered_data.sort_values(["locus_tag", "offset"])
+        filtered_data = filtered_data.sort_values(["chr", "locus_tag", "offset"])
         self.current_filtered_data = filtered_data
 
         # Reset display limit when applying new filters
@@ -702,23 +836,38 @@ class FindGuidesGUI(QWidget):
 
     def update_table_with_data(self, data):
         """Helper method to update table with filtered data"""
+        # Pre-allocate the table size
+        self.table.setRowCount(len(data))
+
+        # Prepare all items at once
+        items = []
         current_locus = None
         use_alternate_color = False
 
+        # Create all items first
         for _, row in data.iterrows():
-            table_row = self.table.rowCount()
-            self.table.insertRow(table_row)
-
             if current_locus != row["locus_tag"]:
                 current_locus = row["locus_tag"]
                 use_alternate_color = not use_alternate_color
 
-            bg_color = "#e6f3ff" if use_alternate_color else "#ffffff"
+            bg_color = QColor("#e6f3ff" if use_alternate_color else "#ffffff")
 
-            for col_idx, value in enumerate(row):
+            # Create row items
+            row_items = []
+            for value in row:
                 item = QTableWidgetItem(str(value))
-                item.setBackground(QColor(bg_color))
-                self.table.setItem(table_row, col_idx, item)
+                item.setBackground(bg_color)
+                row_items.append(item)
+            items.append(row_items)
+
+        # Set all items at once in a batch
+        for row_idx, row_items in enumerate(items):
+            for col_idx, item in enumerate(row_items):
+                self.table.setItem(row_idx, col_idx, item)
+
+        # After setting all items, resize columns to fit content
+        self.table.resizeColumnsToContents()
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
     def save_filtered_data(self):
         if (
