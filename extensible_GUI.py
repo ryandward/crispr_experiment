@@ -18,7 +18,7 @@ from PyQt5.QtCore import Qt
 from targets_gui import BarcodeTargetSeekerGUI  # We'll move your existing GUI here
 from find_guides_gui import FindGuidesGUI  # 1) Import
 from assembly_finder_gui import AssemblyFinderGUI  # New import
-from design_mismatches_gui import MismatchDesignerGUI  # New import
+from design_mismatches_spy_gui import MismatchDesignerGUI  # New import
 
 # Configure and start process
 os.environ["COLUMNS"] = str(120)
