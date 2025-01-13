@@ -28,6 +28,7 @@ from PyQt5.QtGui import QRegExpValidator, QColor, QPixmap
 import csv
 import pandas as pd
 from io import StringIO
+from rich.console import Console
 
 
 class PreviewFileDialog(QFileDialog):
@@ -83,6 +84,8 @@ class FindGuidesGUI(QWidget):
         self.headers = []  # Store headers
         self.filter_widget = None  # Add this
         self.current_display_limit = 1000  # Add this line
+        self.spy_mode = False  # Add this flag
+        self.console = Console(file=sys.stderr)
         self.initUI()
 
     def initUI(self):
@@ -95,6 +98,30 @@ class FindGuidesGUI(QWidget):
             )
         )
         main_layout.addWidget(back_btn)
+
+        # Add S. pyogenes Mode button at the top
+        self.spy_button = QPushButton("Switch to S. pyogenes Mode")
+        self.spy_button.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #dc3545;
+                color: white;
+                padding: 10px;
+                border-radius: 4px;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
+            QPushButton:checked {
+                background-color: #28a745;
+            }
+        """
+        )
+        self.spy_button.setCheckable(True)
+        self.spy_button.clicked.connect(self.toggle_spy_mode)
+        main_layout.addWidget(self.spy_button)
 
         # Create a widget for the "Find all Guides" section
         find_guides_widget = QWidget()
@@ -243,6 +270,87 @@ class FindGuidesGUI(QWidget):
 
         self.setLayout(main_layout)
 
+    def toggle_spy_mode(self):
+        self.spy_mode = self.spy_button.isChecked()
+
+        disabled_style = """
+            QLineEdit, QComboBox {
+                background-color: #f0f0f0;
+                color: #888888;
+                border: 1px solid #cccccc;
+            }
+            QComboBox::drop-down {
+                border: none;
+                background: #f0f0f0;
+            }
+        """
+
+        if self.spy_mode:
+            self.spy_button.setText("S. pyogenes Mode (Active)")
+            # Set and disable fields
+            self.pam_edit.setText("NGG")
+            self.barcode_edit.setText("20")
+            self.mismatches_combo.setCurrentText("3")
+            self.pam_direction_combo.setCurrentText("downstream")
+            self.regulatory_edit.setText("0")
+
+            # Disable fields and apply greyed out style
+            for widget in [
+                self.pam_edit,
+                self.barcode_edit,
+                self.mismatches_combo,
+                self.pam_direction_combo,
+                self.regulatory_edit,
+            ]:
+                widget.setEnabled(False)
+                widget.setStyleSheet(disabled_style)
+
+            # Update button style
+            self.spy_button.setStyleSheet(
+                """
+                QPushButton {
+                    background-color: #28a745;
+                    color: white;
+                    padding: 10px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                    font-size: 14px;
+                }
+                QPushButton:hover {
+                    background-color: #218838;
+                }
+            """
+            )
+        else:
+            self.spy_button.setText("Switch to S. pyogenes Mode")
+            # Enable all fields and remove greyed out style
+            for widget in [
+                self.pam_edit,
+                self.barcode_edit,
+                self.mismatches_combo,
+                self.pam_direction_combo,
+                self.regulatory_edit,
+            ]:
+                widget.setEnabled(True)
+                widget.setStyleSheet("")
+
+            # Reset button style
+            self.spy_button.setStyleSheet(
+                """
+                QPushButton {
+                    background-color: #dc3545;
+                    color: white;
+                    padding: 10px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                    font-size: 14px;
+                }
+                QPushButton:hover {
+                    background-color: #c82333;
+                }
+            """
+            )
+
     def browse_genome_file(self):
         dialog = PreviewFileDialog(self)
         dialog.setFileMode(QFileDialog.ExistingFile)
@@ -256,32 +364,52 @@ class FindGuidesGUI(QWidget):
 
     def run_script(self):
         genome_file = self.genome_file_edit.text().strip()
-        pam = self.pam_edit.text().strip()
-        barcode_length = self.barcode_edit.text().strip()
-        if not genome_file or not pam or not barcode_length:
-            QMessageBox.warning(self, "Input Error", "Please fill in all fields.")
+        if not genome_file:
+            QMessageBox.warning(self, "Input Error", "Please select a genome file.")
             return
 
         self.table.setRowCount(0)
-        script_path = os.path.join(os.path.dirname(__file__), "find_guides.py")
-        mismatches = self.mismatches_combo.currentText().strip()
-        pam_direction = self.pam_direction_combo.currentText()
-        regulatory = self.regulatory_edit.text().strip()
 
-        args = [
-            "--genome-file",
-            genome_file,
-            "--pam",
-            pam,
-            "--barcode-length",
-            barcode_length,
-            "--mismatches",
-            mismatches,
-            "--pam-direction",
-            pam_direction,
-            "--regulatory",
-            regulatory,
-        ]
+        if self.spy_mode:
+            script_path = os.path.join(os.path.dirname(__file__), "find_guides_spy.py")
+            # Fixed command for S. pyogenes mode
+            args = [
+                "--genome-file",
+                genome_file,
+                "--pam",
+                "NGG",
+                "--pam-direction",
+                "downstream",
+                "--barcode-length",
+                "20",
+            ]
+        else:
+            # Regular mode with all parameters
+            script_path = os.path.join(os.path.dirname(__file__), "find_guides.py")
+            pam = self.pam_edit.text().strip()
+            barcode_length = self.barcode_edit.text().strip()
+            mismatches = self.mismatches_combo.currentText().strip()
+            pam_direction = self.pam_direction_combo.currentText()
+            regulatory = self.regulatory_edit.text().strip()
+
+            if not pam or not barcode_length:
+                QMessageBox.warning(self, "Input Error", "Please fill in all fields.")
+                return
+
+            args = [
+                "--genome-file",
+                genome_file,
+                "--pam",
+                pam,
+                "--barcode-length",
+                barcode_length,
+                "--mismatches",
+                mismatches,
+                "--pam-direction",
+                pam_direction,
+                "--regulatory",
+                regulatory,
+            ]
 
         self.progress = QProgressDialog("Running find_guides...", "Cancel", 0, 0, self)
         self.progress.setWindowModality(Qt.WindowModal)
@@ -872,29 +1000,31 @@ class FindGuidesGUI(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
     def save_filtered_data(self):
-        if (
-            not hasattr(self, "current_filtered_data")
-            or self.current_filtered_data is None
-        ):
-            QMessageBox.warning(self, "No Data", "No filtered data to save.")
+        if self.all_data is None:
+            QMessageBox.warning(self, "No Data", "No data loaded to save.")
             return
+
+        # Use filtered data if it exists, otherwise use all data
+        data_to_save = getattr(self, "current_filtered_data", self.all_data)
 
         fname, _ = QFileDialog.getSaveFileName(
             self,
-            "Save Filtered Data",
-            os.path.join(os.path.dirname(__file__), "filtered_data.tsv"),
+            "Save Data",
+            os.path.join(os.path.dirname(__file__), "guides_data.tsv"),
             "TSV Files (*.tsv)",
         )
         if not fname:
             return
 
-        self.current_filtered_data.to_csv(fname, sep="\t", index=False)
-        QMessageBox.information(self, "Data Saved", f"Filtered data saved to:\n{fname}")
+        data_to_save.to_csv(fname, sep="\t", index=False)
+        QMessageBox.information(self, "Data Saved", f"Data saved to:\n{fname}")
 
     def handle_stderr(self):
         stderr = self.process.readAllStandardError().data().decode()
         if stderr:
-            print(stderr)
+            self.console.print(
+                stderr, end=""
+            )  # Using end="" to prevent double newlines
 
     def cancel_process(self):
         if self.process and self.process.state() != QProcess.NotRunning:
