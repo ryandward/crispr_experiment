@@ -45,13 +45,13 @@ class MainWindow(QMainWindow):
 
         # Create and add pages
         self.welcome_page = self.create_welcome_page()
-        self.targets_page = BarcodeTargetSeekerGUI()
+        # self.targets_page = BarcodeTargetSeekerGUI()
         self.find_guides_page = FindGuidesGUI()  # 2) Instantiate
         self.assembly_page = AssemblyFinderGUI()  # Create new page
         self.mismatch_designer_page = MismatchDesignerGUI()  # Add new page instance
 
         self.stacked_widget.addWidget(self.welcome_page)
-        self.stacked_widget.addWidget(self.targets_page)
+        # self.stacked_widget.addWidget(self.targets_page)
         self.stacked_widget.addWidget(self.find_guides_page)
         self.stacked_widget.addWidget(self.assembly_page)
         self.stacked_widget.addWidget(self.mismatch_designer_page)  # Add to stack
@@ -148,12 +148,12 @@ class MainWindow(QMainWindow):
         extra_tools_label.setAlignment(Qt.AlignCenter)
         button_layout.addWidget(extra_tools_label)
 
-        targets_btn = self.create_tool_button(
-            "Identify Guide Targets",
-            "For use with existing guides: Analyze where guides from other sources might target in your genome.",
-            lambda: self.stacked_widget.setCurrentWidget(self.targets_page),
-        )
-        button_layout.addWidget(targets_btn, 0, Qt.AlignCenter)
+        # targets_btn = self.create_tool_button(
+        #     "Identify Guide Targets",
+        #     "For use with existing guides: Analyze where guides from other sources might target in your genome.",
+        #     lambda: self.stacked_widget.setCurrentWidget(self.targets_page),
+        # )
+        # button_layout.addWidget(targets_btn, 0, Qt.AlignCenter)
 
         assembly_btn = self.create_tool_button(
             "Assembly Finder",
