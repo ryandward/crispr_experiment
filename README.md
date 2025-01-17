@@ -11,7 +11,7 @@ A toolkit for analyzing CRISPR experiments
    ```
 3. Create and activate the environment:
    ```bash
-   mamba create --name crispr_experiment --file spec-file.txt
+   mamba env create -f environment.yml -n crispr_experiment
    mamba activate crispr_experiment
    ```
 
@@ -25,19 +25,30 @@ mamba activate crispr_experiment
 Pull the latest changes:
 ```bash
 git pull
-mamba create --name crispr_experiment --file spec-file.txt
 ```
 
-## Development
-After adding new packages, update the environment files:
-```bash
-mamba list --explicit | grep -v "#" | grep -v "file:" > spec-file.txt
-mamba env export | grep -v "prefix" > environment.yml
+## GUIs
+- extensible_GUI:
+  - Main application entry point that provides access to all modules.
+  - Features "Relaunch Application" and "Update Software" options.
+  - Access all tools through a unified, user-friendly interface.
 
-git add environment.yml spec-file.txt
-git commit -m "Updated environment with new packages"
-git push
-```
+Main Tools:
+- find_guides_gui:
+  - Design new CRISPR guides from any genome sequence.
+  - Select parameters like barcode length and PAM sequence.
+  - Generates guides based on your specifications.
+
+- design_mismatches_gui:
+  - Create barcode variants by inserting mismatches into guides.
+  - Check for potential off-targets in your genome.
+  - Filter out problematic or overly similar guides.
+
+Extra Tools:
+- assembly_finder_gui:
+  - Search and download genome assemblies from NCBI.
+  - Input accession numbers to fetch sequences.
+  - Track and manage downloaded assemblies.
 
 [Guide](https://github.com/ryandward/crispr_experiment) | 
 [Issues](https://github.com/ryandward/crispr_experiment/issues) | 
