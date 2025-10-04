@@ -297,12 +297,48 @@ def get_overlap(tar_start, tar_end, feature_start, feature_end, chrom_length):
     return overlap if overlap >= 0 else 0
 
 
+def convert_degenerate_to_regex(pam_pattern):
+    """
+    Convert IUPAC degenerate nucleotide codes to regex character classes.
+    """
+    degenerate_map = {
+        "A": "A",
+        "C": "C",
+        "G": "G",
+        "T": "T",
+        "R": "[AG]",  # puRines
+        "Y": "[CT]",  # pYrimidines
+        "S": "[CG]",  # Strong (3 H-bonds)
+        "W": "[AT]",  # Weak (2 H-bonds)
+        "K": "[GT]",  # Keto
+        "M": "[AC]",  # aMino
+        "B": "[CGT]",  # not A
+        "D": "[AGT]",  # not C
+        "H": "[ACT]",  # not G
+        "V": "[ACG]",  # not T
+        "N": ".",  # any nucleotide
+    }
+
+    regex_pattern = ""
+    for char in pam_pattern.upper():
+        regex_pattern += degenerate_map.get(char, char)
+
+    return regex_pattern
+
+
 def pam_matches(pam_pattern, extracted_pam):
     if not extracted_pam:
         return False
     if pam_pattern == "N" * len(pam_pattern) or not pam_pattern:
         return True
-    return bool(re.match(pam_pattern.replace("N", "."), extracted_pam))
+
+    # Only check the first len(pam_pattern) characters of extracted_pam
+    if len(extracted_pam) < len(pam_pattern):
+        return False
+
+    test_seq = extracted_pam[: len(pam_pattern)]
+    regex_pattern = convert_degenerate_to_regex(pam_pattern)
+    return bool(re.match(regex_pattern + "$", test_seq))
 
 
 def parse_sam_output(
@@ -493,7 +529,13 @@ def run_bowtie_and_parse(
     regulatory,
 ):
     results = []
-    with tempfile.TemporaryDirectory() as temp_dir:
+    # Use a temp directory with more space than /tmp
+    temp_base = (
+        os.path.expanduser("~/tmp")
+        if os.path.exists(os.path.expanduser("~/tmp"))
+        else None
+    )
+    with tempfile.TemporaryDirectory(dir=temp_base) as temp_dir:
         genome_index_temp_name = tempfile.NamedTemporaryFile(
             dir=temp_dir, delete=False
         ).name
@@ -588,7 +630,13 @@ def main(args):
     console = Console(file=sys.stderr)
     console.log("[bold red]Initializing barcode target seeker[/bold red]")
     num_threads = cpu_count() // 2
-    with tempfile.TemporaryDirectory() as working_dir:
+    # Use a temp directory with more space than /tmp
+    temp_base = (
+        os.path.expanduser("~/tmp")
+        if os.path.exists(os.path.expanduser("~/tmp"))
+        else None
+    )
+    with tempfile.TemporaryDirectory(dir=temp_base) as working_dir:
         topological_fasta_file_name = os.path.join(
             working_dir,
             os.path.splitext(os.path.basename(args.genome_file))[0] + ".fasta",

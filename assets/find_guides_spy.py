@@ -18,11 +18,41 @@ def is_dna(sequence):
     return all(base in "GATC" for base in sequence)
 
 
+def convert_degenerate_to_regex(pam_pattern):
+    """
+    Convert IUPAC degenerate nucleotide codes to regex character classes.
+    """
+    degenerate_map = {
+        "A": "A",
+        "C": "C",
+        "G": "G",
+        "T": "T",
+        "R": "[AG]",  # puRines
+        "Y": "[CT]",  # pYrimidines
+        "S": "[CG]",  # Strong (3 H-bonds)
+        "W": "[AT]",  # Weak (2 H-bonds)
+        "K": "[GT]",  # Keto
+        "M": "[AC]",  # aMino
+        "B": "[CGT]",  # not A
+        "D": "[AGT]",  # not C
+        "H": "[ACT]",  # not G
+        "V": "[ACG]",  # not T
+        "N": "[ATGC]",  # any nucleotide
+    }
+
+    regex_pattern = ""
+    for char in pam_pattern.upper():
+        regex_pattern += degenerate_map.get(char, char)
+
+    return regex_pattern
+
+
 def find_sequences_with_barcode_and_pam(
     topological_fasta_file_name, barcode_length, pam
 ):
     matching_sequences = set()
-    pam_regex = re.compile(pam.replace("N", "[ATGC]"))
+    pam_regex_pattern = convert_degenerate_to_regex(pam)
+    pam_regex = re.compile(pam_regex_pattern)
 
     with open(topological_fasta_file_name, "rt") as handle:
         for record in SeqIO.parse(handle, "fasta"):
@@ -61,7 +91,13 @@ def create_sgRNA_fasta(matching_sequences, sgRNA_fasta_file_name):
 def main(args):
     console = Console(file=sys.stderr)
 
-    with tempfile.TemporaryDirectory() as working_dir:
+    # Use a temp directory with more space than /tmp
+    temp_base = (
+        os.path.expanduser("~/tmp")
+        if os.path.exists(os.path.expanduser("~/tmp"))
+        else None
+    )
+    with tempfile.TemporaryDirectory(dir=temp_base) as working_dir:
         console.log("[bold red]Initializing barcode target builder[/bold red]")
 
         topological_fasta_file_name = os.path.join(
