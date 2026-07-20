@@ -106,7 +106,7 @@ GCTAGCTAGCTAGCTAGCTA     LOC101252304   another_gene   NC_015444.3  TTTA  0     
 --regulatory 500  # Include 500bp regulatory regions
 ```
 
-## 🛠 Advanced Usage
+## Advanced Usage
 
 ### Large Genome Processing
 For genomes with millions of potential guides:
