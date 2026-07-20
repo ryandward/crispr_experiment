@@ -2,7 +2,7 @@
 
 A high-performance toolkit for designing and analyzing CRISPR guide RNAs with advanced features including degenerate PAM support, genome-scale processing, and comprehensive off-target analysis.
 
-## 🔬 Key Features
+## Key Features
 
 - **Degenerate PAM Support**: Use IUPAC nucleotide codes (V, R, Y, W, S, K, M, B, D, H, N) for precise PAM matching
 - **Circular Genome Support**: Seamlessly handles circular chromosomes, plasmids, and organellar genomes
@@ -13,7 +13,7 @@ A high-performance toolkit for designing and analyzing CRISPR guide RNAs with ad
 - **Gene Annotation**: Automatic mapping of guides to genes with locus tags and feature types
 - **High-Performance Computing**: Polars-based data processing for large datasets
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation
 
@@ -53,7 +53,7 @@ python assets/find_guides.py \
     --pam-direction downstream > cas9_guides.tsv
 ```
 
-## 🧬 Degenerate PAM Examples
+## Degenerate PAM Examples
 
 This toolkit supports IUPAC degenerate nucleotide codes for precise PAM matching:
 
@@ -68,7 +68,7 @@ This toolkit supports IUPAC degenerate nucleotide codes for precise PAM matching
 
 **Example**: `TTTV` matches TTTA, TTTC, TTTG but excludes TTTT - perfect for Cas12a specificity.
 
-## 📊 Output Format
+## Output Format
 
 Results are provided in tab-separated format with genomic coordinate sorting:
 
@@ -78,7 +78,7 @@ ATCGATCGATCGATCGATCG     LOC101252303   gene_name      NC_015444.3  TTTC  0     
 GCTAGCTAGCTAGCTAGCTA     LOC101252304   another_gene   NC_015444.3  TTTA  0          12400       12420
 ```
 
-## ⚡ Performance Features
+## Performance Features
 
 - **Memory Efficient**: Process 30+ million guides without crashes
 - **Streaming Processing**: Results written incrementally to handle large datasets
@@ -86,7 +86,7 @@ GCTAGCTAGCTAGCTAGCTA     LOC101252304   another_gene   NC_015444.3  TTTA  0     
 - **Smart Deduplication**: Genomic coordinate-based duplicate removal
 - **Optimized I/O**: Direct file output bypasses memory bottlenecks
 
-## 🧮 Analysis Modes
+## Analysis Modes
 
 ### Unique Mapping Only (`-k 1`)
 ```bash
@@ -140,7 +140,7 @@ python assets/find_guides.py \
 # Handles coordinate wrapping at origin automatically
 ```
 
-## 📦 Available Tools
+## Available Tools
 
 ### Command Line Interface
 - `find_guides.py` - Main guide design tool
@@ -152,7 +152,7 @@ python assets/find_guides.py \
 - `design_mismatches_gui.py` - Mismatch analysis
 - `assembly_finder_gui.py` - Genome database search
 
-## 🔧 Dependencies
+## Dependencies
 
 Core computational dependencies:
 - **Bowtie**: Fast genome alignment
@@ -161,7 +161,7 @@ Core computational dependencies:
 - **PyArrow**: Efficient data formats
 - **Rich**: Enhanced terminal output
 
-## 📈 Scalability
+## Scalability
 
 Successfully tested with:
 - **Tomato genome**: 900+ Mb, 31K+ genes, linear chromosomes
@@ -170,7 +170,7 @@ Successfully tested with:
 - **Final output**: Millions of unique guides
 - **Processing time**: ~30 minutes on standard hardware
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
 ### Memory Issues
 ```bash
@@ -190,22 +190,22 @@ export TMPDIR=/path/to/fast/storage
 --mismatches 0
 ```
 
-## 📚 Citation
+## Citation
 
 If you use this toolkit in your research, please cite:
 ```
 [Citation information to be added]
 ```
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md).
 
-## 📄 License
+## License
 
 [License information to be added]
 
-## 🐛 Support
+## Support
 
 - [Issues](https://github.com/ryandward/crispr_experiment/issues)
 - [Discussions](https://github.com/ryandward/crispr_experiment/discussions)
